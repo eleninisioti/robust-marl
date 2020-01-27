@@ -28,7 +28,7 @@ class Bar:
     """
     # TODO: find how these values affect the result
     # Best values for 2 agents: 4,2,1
-    G = 4
+    G = 3
     S = 2
     B = 1
     if action==0:

@@ -7,6 +7,43 @@ import os
 from bar import *
 from agent import *
 from erev_agent import *
+import random
+
+def attack(agents, capacity):
+  """ Simulates an attack by adversaries.
+
+  Adversaries choose the agents to attack and perform actions on their behalf.
+  """
+  # ----- choose victims -----
+  # choose the K agents with the current highest probability of staying at home
+  attacked = [0]*len(agents)
+  for idx, agent in enumerate(agents):
+    if agent.pure_eq[0][-1] > 0.95:
+      attacked[idx] = 1
+    if sum(attacked) >= args.nadvs:
+      break
+
+  # if not enough victims, choose agents that are not confident that they
+  # will go to the bar
+  if sum(attacked) < args.nadvs:
+    for idx, agent in enumerate(agents):
+      if agent.pure_eq[1][-1] < 0.5:
+        attacked[idx] = 1
+      if sum(attacked) >= args.nadvs:
+        break
+
+  # if still not enough victims, randomly choose some agents
+  if sum(attacked) < args.nadvs:
+    rand_victims = random.choices(list(range(len(agents))), args.nadvs-sum(
+      attacked))
+    for idx in rand_victims:
+      attacked[idx] = 1
+
+  for idx, agent in enumerate(agents):
+    if attacked[idx] == 1:
+      agent.attack(force_go=True)
+
+  return attacked
 
 def main(args):
 
@@ -32,16 +69,20 @@ def main(args):
   # ----- main learning phase ------
   turnouts = []
   optimism_stats = [] # what percentage believes that the bar will not be busy
-
+  attacked = [0]*len(agents)
 
   for iter in range(args.iterations):
+
+    # detect an attack
+    if iter == args.attack:
+      attacked = attack(agents, args.capacity)
 
     # all agents decide whether to go
     turnout = 0
     actions = []
 
     for idx, agent in enumerate(agents):
-      action = agent.decide()
+      action = agent.decide(attacked[idx])
       turnout += action
       actions.append(action)
 
@@ -81,8 +122,15 @@ def main(args):
     plt.ylabel("Probability of pure equilbirum")
     plt.legend(loc="lower right")
     plt.title("Agent " + str(idx))
-    plt.savefig("../projects/" + args.project + "/plots/agents/agent_" + str(
+    if attacked[idx] == 1:
+      plt.savefig("../projects/" + args.project +
+                  "/plots/agents/attacked_agent_" + str(
       idx) + ".eps")
+    else:
+      if attacked[idx] == 1:
+        plt.savefig("../projects/" + args.project +
+                    "/plots/agents/agent_" + str(
+          idx) + ".eps")
 
     plt.clf()
 
@@ -106,6 +154,16 @@ if __name__ == '__main__':
                         help='Number of agents',
                         type=int,
                         default=100)
+
+  parser.add_argument('--nadvs',
+                      help='Number of adversaries',
+                      type=int,
+                      default=1)
+
+  parser.add_argument('--attack',
+                      help='Time step of attack',
+                      type=int,
+                      default=9999999999)
 
   parser.add_argument('--horizon',
                       help='Number of time steps in the past agents look at.',
