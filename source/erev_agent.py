@@ -8,6 +8,7 @@ class ErevAgent():
   def __init__(self):
     self.actions = [0,1]
     self.propensities = [1, 1] # should be positive
+    self.pure_eq = {0: [], 1: []}
 
   def decide(self):
     """ Decide whether to attend the bar."""
@@ -16,7 +17,15 @@ class ErevAgent():
 
     probs = []
     for a in self.actions:
-      probs.append(self.propensities[a] / sum(self.propensities))
+      prob = self.propensities[a] / sum(self.propensities)
+      probs.append(prob)
+      if prob > 0.9:
+        self.pure_eq[a].append(1)
+      else:
+        self.pure_eq[a].append(0)
+
+
+
 
     # random sample
     x = random.uniform(0,1)

@@ -11,8 +11,8 @@ from erev_agent import *
 def main(args):
 
   # ----- set up -----
-  if not os.path.exists("../projects/" + args.project + "/plots"):
-    os.makedirs("../projects/" + args.project + "/plots")
+  if not os.path.exists("../projects/" + args.project + "/plots/agents"):
+    os.makedirs("../projects/" + args.project + "/plots/agents")
 
   # initialize bar
   bar = Bar(args.capacity, args.technique)
@@ -33,15 +33,18 @@ def main(args):
   turnouts = []
   optimism_stats = [] # what percentage believes that the bar will not be busy
 
+
   for iter in range(args.iterations):
 
     # all agents decide whether to go
     turnout = 0
     actions = []
-    for agent in agents:
+
+    for idx, agent in enumerate(agents):
       action = agent.decide()
       turnout += action
       actions.append(action)
+
 
 
     # update agents
@@ -68,7 +71,33 @@ def main(args):
   plt.savefig("../projects/" + args.project + "/plots/optimism.eps")
   plt.clf()
 
+  # plot pure equilibria with time
+  for idx, agent in enumerate(agents):
+    stay_eq = agent.pure_eq[0]
+    go_eq = agent.pure_eq[1]
+    plt.plot(list(range(args.iterations)), stay_eq, label="Stay")
+    plt.plot(list(range(args.iterations)), go_eq, label="Go")
+    plt.xlabel("Time, $T$")
+    plt.ylabel("Probability of pure equilbirum")
+    plt.legend(loc="lower right")
+    plt.title("Agent " + str(idx))
+    plt.savefig("../projects/" + args.project + "/plots/agents/agent_" + str(
+      idx) + ".eps")
 
+    plt.clf()
+
+  # plot histogram of pure equilibria at the end of learning
+  stay_agents = 0
+  go_agents = 0
+  for idx, agent in enumerate(agents):
+    stay_agents += agent.pure_eq[0][-1]
+    go_agents += agent.pure_eq[1][-1]
+  stay_agents = stay_agents/len(agents)
+  go_agents = go_agents/len(agents)
+  plt.bar([0,1], [stay_agents, go_agents], tick_label=["Stay", "Go"])
+  plt.ylabel("Percentage of agents with pure Equilbrium")
+  plt.savefig("../projects/" + args.project + "/plots/eq_bar.eps")
+  plt.clf()
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()

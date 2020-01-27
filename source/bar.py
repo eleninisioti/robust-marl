@@ -26,8 +26,10 @@ class Bar:
     crowded and S, the payoff when the agent does not go to the bar.
     G > S > B.
     """
-    G = 5
-    S = 3
+    # TODO: find how these values affect the result
+    # Best values for 2 agents: 4,2,1
+    G = 4
+    S = 2
     B = 1
     if action==0:
       return S
