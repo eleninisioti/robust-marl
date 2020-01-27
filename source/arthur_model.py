@@ -2,7 +2,10 @@
  in https://ocw.tudelft.nl/wp-content/uploads/ElFarolArtur1994.pdf and
  further analyzed in https://pdfs.semanticscholar.org/7c7b/35114b3119ef47bb0d59cae6c6569ad63cc3.pdf.
 
-A model is a mapping from histories to turnouts, generated randomly.
+A model is a mapping from histories to turnouts, generated randomly. At each
+time step, an agent consults the model with the highest score and the score
+for all models is updated based on the discrepancy between its prediction and
+ the actual turnout.
 """
 
 import numpy as np
@@ -18,6 +21,13 @@ class ArthurModel(Model):
     self.bar = bar
     self.seed = seed
     self.nagents = nagents
+
+
+  def update(self, turnout):
+    """ Update model based on observations
+    """
+    self.score = self.rate * self.score + (1 - self.rate) * 1 / (np.abs(
+      self.last_predict - turnout) + 1)
 
 
   def predict(self, history):

@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import os
 from bar import *
 from agent import *
+from erev_agent import *
 
 def main(args):
 
@@ -14,13 +15,19 @@ def main(args):
     os.makedirs("../projects/" + args.project + "/plots")
 
   # initialize bar
-  bar = Bar(args.capacity)
+  bar = Bar(args.capacity, args.technique)
 
   # initialize agents
   agents = []
   for ag_idx in range(args.nagents):
-    agents.append(Agent(id=ag_idx, bar=bar, nagents=args.nagents,
-                        horizon=args.horizon))
+    if args.technique == "Erev":
+      agent = ErevAgent()
+
+    elif args.technique == "Arthur":
+      agent = Agent(id=ag_idx, bar=bar, nagents=args.nagents,
+                        horizon=args.horizon)
+
+    agents.append(agent)
 
   # ----- main learning phase ------
   turnouts = []
@@ -30,14 +37,18 @@ def main(args):
 
     # all agents decide whether to go
     turnout = 0
+    actions = []
     for agent in agents:
-      turnout += agent.decide()
+      action = agent.decide()
+      turnout += action
+      actions.append(action)
 
 
     # update agents
     optimists = 0
-    for agent in agents:
-      optimists += agent.update(bar.social_welfare(turnout))
+    for idx, agent in enumerate(agents):
+      action = actions[idx]
+      optimists += agent.update(bar.reward(action, turnout))
 
     # keep info for plotting
     turnouts.append(turnout)
@@ -86,6 +97,13 @@ if __name__ == '__main__':
                       help='Name of project',
                       type=str,
                       default="temp")
+
+  parser.add_argument('--technique',
+                      help='Technique employed to solve the problem. Choose '
+                           'between Erev and Arthur',
+                      type=str,
+                      default="Erev")
+
   args = parser.parse_args()
   main(args)
 

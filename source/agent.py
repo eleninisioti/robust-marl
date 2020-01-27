@@ -32,7 +32,7 @@ class Agent:
 
 
   def decide(self):
-    """ Decide whether to attend a bar."""
+    """ Decide whether to attend the bar."""
 
     # consult best model
     attend = self.models[self.active_predictor].consult(self.history)

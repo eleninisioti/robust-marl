@@ -15,9 +15,7 @@ class Model:
     pass
 
 
-  def update(self, turnout):
-    self.score = self.rate * self.score + (1 - self.rate) * 1 / (np.abs(
-      self.last_predict - turnout) + 1)
+
 
   def consult(self):
     """ Consult a model on whether you should attend the bar.
