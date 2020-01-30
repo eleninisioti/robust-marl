@@ -4,10 +4,14 @@
 import argparse
 import matplotlib.pyplot as plt
 import os
+import random
+import numpy as np
+import pickle
+
 from bar import *
 from agent import *
 from erev_agent import *
-import random
+from qlearning_agent import *
 
 def attack(agents, capacity):
   """ Simulates an attack by adversaries.
@@ -34,7 +38,7 @@ def attack(agents, capacity):
 
   # if still not enough victims, randomly choose some agents
   if sum(attacked) < args.nadvs:
-    rand_victims = random.choices(list(range(len(agents))), args.nadvs-sum(
+    rand_victims = random.choices(list(range(len(agents))), k=args.nadvs-sum(
       attacked))
     for idx in rand_victims:
       attacked[idx] = 1
@@ -52,17 +56,23 @@ def main(args):
     os.makedirs("../projects/" + args.project + "/plots/agents")
 
   # initialize bar
-  bar = Bar(args.capacity, args.technique)
+  bar = Bar(capacity=args.capacity, technique=args.technique,
+            min_payoff=args.minpayoff)
 
   # initialize agents
   agents = []
   for ag_idx in range(args.nagents):
     if args.technique == "Erev":
-      agent = ErevAgent()
+      #rate = random.uniform(0,1)
+      rate=1
+      agent = ErevAgent(min_payoff=args.minpayoff, rate=rate)
 
     elif args.technique == "Arthur":
       agent = Agent(id=ag_idx, bar=bar, nagents=args.nagents,
                         horizon=args.horizon)
+
+    elif args.technique == "Qlearning":
+      agent = QlearningAgent(min_payoff=args.minpayoff)
 
     agents.append(agent)
 
@@ -86,8 +96,6 @@ def main(args):
       turnout += action
       actions.append(action)
 
-
-
     # update agents
     optimists = 0
     for idx, agent in enumerate(agents):
@@ -97,6 +105,15 @@ def main(args):
     # keep info for plotting
     turnouts.append(turnout)
     optimism_stats.append(optimists/args.nagents)
+
+  # find meand and variance of error
+  optimal = args.capacity
+  error = [np.abs(optimal - t) for t in turnouts[int(0.5*len(
+    turnouts)):]]
+  print(turnouts[int(0.5*len(
+    turnouts)):])
+  print(optimal, error)
+  print("Mean error: ", np.mean(error), " Mean variance: ", np.var(error))
 
   # plot turnout with time
   plt.plot(list(range(args.iterations)), turnouts)
@@ -127,8 +144,7 @@ def main(args):
                   "/plots/agents/attacked_agent_" + str(
       idx) + ".eps")
     else:
-      if attacked[idx] == 1:
-        plt.savefig("../projects/" + args.project +
+      plt.savefig("../projects/" + args.project +
                     "/plots/agents/agent_" + str(
           idx) + ".eps")
 
@@ -147,6 +163,10 @@ def main(args):
   plt.savefig("../projects/" + args.project + "/plots/eq_bar.eps")
   plt.clf()
 
+  # save data for reproducibility
+  pickle.dump([turnouts], file=open("../projects/" +
+                                    args.project + "/experiment_data.pkl","wb"))
+
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
 
@@ -154,6 +174,12 @@ if __name__ == '__main__':
                         help='Number of agents',
                         type=int,
                         default=100)
+
+  parser.add_argument('--minpayoff',
+                        help='Minimum value of payoffs',
+                        type=int,
+                        default=0)
+
 
   parser.add_argument('--nadvs',
                       help='Number of adversaries',

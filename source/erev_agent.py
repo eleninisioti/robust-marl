@@ -1,14 +1,17 @@
-""" Contains the implementation of a reinforcement learning agent."""
+""" Contains the implementation of a reinforcement learning agent based on
+the Erev method."""
 
 import numpy as np
 import random
+
 class ErevAgent():
 
 
-  def __init__(self):
+  def __init__(self, min_payoff, rate=0.01):
     self.actions = [0,1]
-    self.propensities = [1, 1] # should be positive
+    self.propensities = [rate, rate] # should be positive
     self.pure_eq = {0: [], 1: []}
+    self.min_payoff = min_payoff
 
   def attack(self, force_go=True, reverse=False):
     """ An adversary attacks the agent.
@@ -65,7 +68,8 @@ class ErevAgent():
   def update(self, payoff):
     """ Update propensities.
     """
+    reward = payoff - self.min_payoff
     self.propensities[self.current_action] = self.propensities[
-                                            self.current_action] + payoff
+                                            self.current_action] + reward
     return self.current_action
 

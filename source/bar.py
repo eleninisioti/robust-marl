@@ -9,9 +9,10 @@ class Bar:
 
   attendants = 0
 
-  def __init__(self, capacity=60, technique="Erev"):
+  def __init__(self, min_payoff, capacity=60, technique="Erev"):
     self.capacity = capacity
     self.technique = technique
+    self.min_payoff = min_payoff
 
   def visit(self):
     """ An agent visits the bar"""
@@ -28,9 +29,10 @@ class Bar:
     """
     # TODO: find how these values affect the result
     # Best values for 2 agents: 4,2,1
-    G = 3
-    S = 2
-    B = 1
+    G = self.min_payoff + 2
+    S = self.min_payoff + 1
+    B = self.min_payoff
+
     if action==0:
       return S
     else:
@@ -56,6 +58,8 @@ class Bar:
     """ Returns the reward to an agent, depending on its technique.
     """
     if self.technique == "Erev":
+      return self.payoff(action, turnout)
+    elif self.technique == "Qlearning":
       return self.payoff(action, turnout)
     elif self.technique == "Arthur":
       return self.social_welfare(turnout)
