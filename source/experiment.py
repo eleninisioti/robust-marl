@@ -83,14 +83,15 @@ def main(args):
 
   for iter in range(args.iterations):
 
-    # detect an attack
-    if iter == args.attack:
-      attacked = attack(agents, args.capacity)
-
     # all agents decide whether to go
     turnout = 0
     actions = []
 
+    if iter == args.safe_attack:
+      attacked = attack(agents, args.capacity)
+
+    # if iter == (args.safe_attack +1):
+    #   attacked = [0] * len(agents)
     for idx, agent in enumerate(agents):
       action = agent.decide(attacked[idx])
       turnout += action
@@ -100,7 +101,7 @@ def main(args):
     optimists = 0
     for idx, agent in enumerate(agents):
       action = actions[idx]
-      optimists += agent.update(bar.reward(action, turnout))
+      optimists += agent.update(bar.reward(action, turnout), attacked[idx])
 
     # keep info for plotting
     turnouts.append(turnout)
@@ -115,12 +116,6 @@ def main(args):
   print(optimal, error)
   print("Mean error: ", np.mean(error), " Mean variance: ", np.var(error))
 
-  # plot turnout with time
-  plt.plot(list(range(args.iterations)), turnouts)
-  plt.xlabel("Time, $T$")
-  plt.ylabel("Turnout, $W$")
-  plt.savefig("../projects/" + args.project + "/plots/turnout.eps")
-  plt.clf()
 
   # plot optimism with time
   plt.plot(list(range(args.iterations)), optimism_stats)
@@ -163,12 +158,56 @@ def main(args):
   plt.savefig("../projects/" + args.project + "/plots/eq_bar.eps")
   plt.clf()
 
+  exec_turnouts = []
+  attacked = [0] * len(agents)
+  if not args.online:
+
+    # Q-learning agents do not explore during execution
+    if args.technique == "Qlearning":
+      for agent in agents:
+        agent.epsilon = 0
+        agent.temperature = 0
+
+    # execute learned policy
+    for exec_iter in range(args.exec_iterations):
+
+      # perform an attack
+      if exec_iter == args.attack:
+        attacked = attack(agents, args.capacity)
+
+      # execute policy
+      exec_turnout = 0
+
+      for idx, agent in enumerate(agents):
+        action = agent.decide(attacked[idx])
+        exec_turnout += action
+
+      exec_turnouts.append(exec_turnout)
+
+    plt.plot(list(range(args.exec_iterations)), exec_turnouts,
+             label="Execution")
+
+  # plot turnout with time
+  plt.plot(list(range(args.iterations)), turnouts, label="Learning")
+  plt.xlabel("Time, $T$")
+  plt.ylabel("Turnout, $W$")
+  plt.legend(loc="lower right")
+  plt.savefig("../projects/" + args.project + "/plots/turnout_total.eps")
+  plt.clf()
+
+
   # save data for reproducibility
-  pickle.dump([turnouts], file=open("../projects/" +
+  pickle.dump([turnouts, exec_turnouts], file=open("../projects/" +
                                     args.project + "/experiment_data.pkl","wb"))
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
+
+  parser.add_argument('--online',
+                      help='Learn online. Othewise, learns offline and '
+                           'executes policy.',
+                      default=False,
+                      action="store_true")
 
   parser.add_argument('--nagents',
                         help='Number of agents',
@@ -191,6 +230,11 @@ if __name__ == '__main__':
                       type=int,
                       default=9999999999)
 
+  parser.add_argument('--safe_attack',
+                      help='Time step of attack during learnign',
+                      type=int,
+                      default=9999999999)
+
   parser.add_argument('--horizon',
                       help='Number of time steps in the past agents look at.',
                       type=int,
@@ -204,7 +248,12 @@ if __name__ == '__main__':
   parser.add_argument('--iterations',
                       help='Number of learning iterations',
                       type=int,
-                      default=100)
+                      default=500)
+
+  parser.add_argument('--exec_iterations',
+                      help='Number of execution iterations',
+                      type=int,
+                      default=500)
 
   parser.add_argument('--project',
                       help='Name of project',
