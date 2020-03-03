@@ -42,16 +42,16 @@ class Bar:
         return G
 
 
-
-
   def social_welfare(self, turnout):
     """ Quantify social welfare based on turnout.
+
+    Social welfare is a percentage of how close to capacity the bar is,
+    with 1 denoting a full bar and 0 an empty. If turnout exceeds capacity,
+    then social welfare is -100.
     """
-    # if turnout > self.capacity:
-    #   social_welfare = 0
-    # else:
-    #   social_welfare = 1
-    social_welfare = turnout
+    social_welfare = 1 - (self.capacity-turnout)/self.capacity
+    if social_welfare > 1:
+      social_welfare = -100
     return social_welfare
 
   def reward(self, action, turnout):

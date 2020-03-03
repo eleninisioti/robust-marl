@@ -1,0 +1,70 @@
+""" Contains the implementation of a network node. """
+
+import numpy as np
+
+class Node:
+
+  def __init__(self, capacity, quick_node, idx, costs, neighbors,
+             cutoff=0):
+    self.capacity = capacity
+    self.cutoff = cutoff
+    if quick_node:
+      self.spawn_rate = 0.2
+      self.serve_rate = 2* self.spawn_rate
+    else:
+      if idx ==2:
+
+        self.spawn_rate = 0
+        self.serve_rate = 0
+      else:
+        self.spawn_rate = 1
+        self.serve_rate = 0
+    self.load = 0
+    self.neighbors = neighbors
+    self.idx = idx
+    self.costs = costs
+
+  def reset(self):
+    """ Reset node to start new episode.
+
+    Resets the load
+    """
+    self.load = 0
+
+
+  def transition(self, arrivals, departures):
+    """ Implements the state transition of a node.
+
+    The state equals the load of the node.
+
+    Args: arrivals (int): number of packets arriving from neighboring nodes
+          departures (int): number of packets sent to neighboring nodes
+
+    """
+    underflow = False
+    overflow = False
+
+    self.load = self.load - departures
+    if self.load < self.cutoff:
+      underflow = True
+      self.load = self.cutoff
+
+    # a new packet is spawned
+    spawned = np.random.binomial(n=1, p=self.spawn_rate)
+
+    # an existing packet is served
+    served = np.random.binomial(n=1, p=self.serve_rate)
+
+    self.load = self.load + spawned - served + arrivals
+
+     # what happens if negative load?
+
+    if self.load > (self.capacity-1):
+      overflow = True
+      self.load = self.capacity -1
+    return underflow, overflow
+
+
+
+
+

@@ -72,7 +72,8 @@ def main(args):
                         horizon=args.horizon)
 
     elif args.technique == "Qlearning":
-      agent = QlearningAgent(min_payoff=args.minpayoff)
+      agent = QlearningAgent(min_payoff=args.minpayoff, nagents=args.nagents,
+                             stateless=args.stateless)
 
     agents.append(agent)
 
@@ -80,20 +81,40 @@ def main(args):
   turnouts = []
   optimism_stats = [] # what percentage believes that the bar will not be busy
   attacked = [0]*len(agents)
-
+  attack_points = [0]*args.iterations
+  welfare = []
+  under_attack = -5
   for iter in range(args.iterations):
 
     # all agents decide whether to go
     turnout = 0
     actions = []
 
-    if iter == args.safe_attack:
+    # determine whether there is an attack
+    x = random.uniform(0,1)
+    if x < args.learn_attack_prob:
       attacked = attack(agents, args.capacity)
+      under_attack = iter
+
+
+    # if iter == args.safe_attack:
+    #   attacked = attack(agents, args.capacity)
+
+    # if iter == args.safe_attack_stop:
+    #   attacked = [0]*args.iterations
+
+    if iter == (under_attack + 1):
+      attacked = [0] * args.nagents
+      uner_attack = -5
+
+    if 1 in attacked:
+      attack_points[iter] = sum(attacked)
 
     # if iter == (args.safe_attack +1):
     #   attacked = [0] * len(agents)
+    print(iter)
     for idx, agent in enumerate(agents):
-      action = agent.decide(attacked[idx])
+      action = agent.decide(attacked[idx], explore=args.explore)
       turnout += action
       actions.append(action)
 
@@ -101,11 +122,13 @@ def main(args):
     optimists = 0
     for idx, agent in enumerate(agents):
       action = actions[idx]
-      optimists += agent.update(bar.reward(action, turnout), attacked[idx])
+      optimists += agent.update(bar.reward(action, turnout), attacked[idx],
+                                turnout)
 
     # keep info for plotting
     turnouts.append(turnout)
     optimism_stats.append(optimists/args.nagents)
+    welfare.append(bar.social_welfare(turnout))
 
   # find meand and variance of error
   optimal = args.capacity
@@ -158,9 +181,14 @@ def main(args):
   plt.savefig("../projects/" + args.project + "/plots/eq_bar.eps")
   plt.clf()
 
-  exec_turnouts = []
-  attacked = [0] * len(agents)
+
+
   if not args.online:
+
+    exec_turnouts = []
+    attacked = [0] * len(agents)
+    exec_attack_points = [0] * args.exec_iterations
+    exec_welfare = []
 
     # Q-learning agents do not explore during execution
     if args.technique == "Qlearning":
@@ -169,20 +197,35 @@ def main(args):
         agent.temperature = 0
 
     # execute learned policy
+    under_attack = -5
     for exec_iter in range(args.exec_iterations):
 
-      # perform an attack
-      if exec_iter == args.attack:
+      # determine whether there is an attack
+      x = random.uniform(0, 1)
+      if x < args.exec_attack_prob:
         attacked = attack(agents, args.capacity)
+        under_attack = exec_iter
+
+      # stop attack if it is already happening
+      if exec_iter == (under_attack+1):
+        attacked = [0]*args.nagents
+        under_attack = -5
+
+      # if exec_iter == args.attack_stop:
+      #   attacked = [0] * len(agents)
+
+      if 1 in attacked:
+        exec_attack_points[exec_iter] = sum(attacked)
 
       # execute policy
       exec_turnout = 0
 
       for idx, agent in enumerate(agents):
-        action = agent.decide(attacked[idx])
+        action = agent.decide(attacked[idx], explore=args.explore)
         exec_turnout += action
 
       exec_turnouts.append(exec_turnout)
+      exec_welfare.append(bar.social_welfare(exec_turnout))
 
     plt.plot(list(range(args.exec_iterations)), exec_turnouts,
              label="Execution")
@@ -195,15 +238,36 @@ def main(args):
   plt.savefig("../projects/" + args.project + "/plots/turnout_total.eps")
   plt.clf()
 
+  # plot histogram of pure equilibria at the end of execution
+  stay_agents = 0
+  go_agents = 0
+  for idx, agent in enumerate(agents):
+    stay_agents += agent.pure_eq[0][-1]
+    go_agents += agent.pure_eq[1][-1]
+  stay_agents = stay_agents/len(agents)
+  go_agents = go_agents/len(agents)
+  plt.bar([0,1], [stay_agents, go_agents], tick_label=["Stay", "Go"])
+  plt.ylabel("Percentage of agents with pure Equilbrium")
+  plt.savefig("../projects/" + args.project + "/plots/eq_bar_exec.eps")
+  plt.clf()
+
 
   # save data for reproducibility
-  pickle.dump([turnouts, exec_turnouts], file=open("../projects/" +
+  data_learn = [turnouts, attack_points, welfare]
+  data_exec = [exec_turnouts, exec_attack_points, exec_welfare]
+  pickle.dump([data_learn, data_exec, args], file=open("../projects/" +
                                     args.project + "/experiment_data.pkl","wb"))
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
 
   parser.add_argument('--online',
+                      help='Learn online. Othewise, learns offline and '
+                           'executes policy.',
+                      default=False,
+                      action="store_true")
+
+  parser.add_argument('--stateless',
                       help='Learn online. Othewise, learns offline and '
                            'executes policy.',
                       default=False,
@@ -225,13 +289,28 @@ if __name__ == '__main__':
                       type=int,
                       default=1)
 
-  parser.add_argument('--attack',
+  parser.add_argument('--learn_attack_prob',
                       help='Time step of attack',
+                      type=float,
+                      default=0.1)
+
+  parser.add_argument('--exec_attack_prob',
+                      help='Time step of attack',
+                      type=float,
+                      default=0.1)
+
+  parser.add_argument('--safe_attack',
+                      help='Time step of attack during learning',
                       type=int,
                       default=9999999999)
 
-  parser.add_argument('--safe_attack',
-                      help='Time step of attack during learnign',
+  parser.add_argument('--safe_attack_stop',
+                      help='Time step of end of attack during learning',
+                      type=int,
+                      default=9999999999)
+
+  parser.add_argument('--attack_stop',
+                      help='Time step of end of attack during execution',
                       type=int,
                       default=9999999999)
 
@@ -265,6 +344,11 @@ if __name__ == '__main__':
                            'between Erev and Arthur',
                       type=str,
                       default="Erev")
+
+  parser.add_argument('--explore',
+                      help='Exploration technique to use.',
+                      type=str,
+                      default="Boltzmann")
 
   args = parser.parse_args()
   main(args)
