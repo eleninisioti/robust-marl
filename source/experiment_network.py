@@ -5,340 +5,400 @@ import argparse
 import os
 import random
 import pickle
+import numpy
 
 from agent import *
 from q_agent import *
+from doubleq_agent import *
 from romq_agent import *
 from node import *
-
-def perform_attack(agents, attack_size, attack_type="worst"):
-  """ Simulates an attack by adversaries.
-
-  Adversaries choose the agents to attack and perform actions on their behalf.
-  """
-  # ----- choose victims -----
-  # choose the K agents with the current highest probability of staying at home
-  attackers = [0]*len(agents)
-
-  # random attack
-  if attack_type == "random":
-    attackers = random.sample(nodes, args.K)
-    attack_actions = {}
-    for item in attackers:
-      serve = random.randint(0,1)
-      send = random.choice(agents[item].neighbors)
-      attack_actions[item] = [serve, send]
-
-  # worst-case attack (picks partition that mimizes Q-value function
-
-  elif attack_type == "worst":
-    actions = []
-    for agent in agents:
-      actions.append(agent.find_adversarial_actions(attack_size))
-    attack_actions = {}
-    for action in actions:
-      for key,value in action.items():
-        attack_actions[key] = value
-
-  return attack_actions
+from minimaxq_agent import *
+from sarsa_agent import *
+from tools import *
 
 def main(args):
 
   # ----- set up -----
-  if not os.path.exists("../projects/" + args.project + "/plots"):
-    os.makedirs("../projects/" + args.project + "/plots")
+  
+  # create project directories
+  # interm_episodes = list(range(args.episodes*args.horizon))[0::(int(
+  #   args.episodes*args.horizon / 20) )]
+  # interm_episodes.append(args.episodes-1)
+  #interm_episodes = interm_episodes[1:]
 
-  # create nodes/agents
+  for trial in range(args.trials):
+    trial_plots_dir = "../projects/" + args.project + "/trial_" +  str(trial) +\
+                      "/adversary_" + args.adversary + "/plots"
+
+    if not os.path.exists(trial_plots_dir):
+
+      os.makedirs(trial_plots_dir)
+
+    # for episode in interm_episodes:
+    #   episode_dir = "../projects/" + args.project + "/trial_" +  str(trial) +\
+    #                 "/episode_" + str(episode) + "/adversary_" + \
+    #                 args.adversary + "_attack_" + args.attack_type
+
+      # if not os.path.exists(episode_dir + "/plots"):
+      #   os.makedirs(episode_dir + "/plots")
+      #
+      # if not os.path.exists(episode_dir + "/data"):
+      #   os.makedirs(episode_dir + "/data")
+
+    policies_dir = "../projects/" + args.project + "/policies/adversary_"\
+                         + args.adversary
+
+    if not os.path.exists(policies_dir):
+
+      os.makedirs(policies_dir)
+
+    max_delta = args.exec_attack_prob
+    delta_values = [0]
+    delta_values.extend(np.arange(start=0.1, stop=max_delta + 0.01, step=0.1))
+
+    args.delta_values = delta_values
+
+
+  # ----- create network of nodes -----
   nodes = []
-
-  # create network topology
   if args.topology == "ring":
-    counter = 1
-    for idx in range(1,args.N+1):
-      left = idx - 1
-      if left < 1:
-        left = args.N
-      right = idx + 1
-      if right > args.N:
-        right = 1
-      neighbors = [0, left, right]
-
-      #define capacity and costs for this node
-      capacity = args.capacity # all nodes equal
-      costs = {left: args.cost, right: args.cost}
-      quick_node = False
-      nodes.append(Node(capacity=capacity, neighbors=neighbors, idx=counter, \
-                                                           costs=costs,
-                        quick_node=quick_node))
-      counter +=1
+    nodes = create_ring_topology(N=args.N, capacity=args.capacity,
+                                cost=args.cost)
 
   elif args.topology == "star":
-    # TODO: needs debugging
-    counter = 0
-    neighbors = list(range(len(nodes) - 1))
-    capacity = args.capacity
-    costs = {}
-    for node in neighbors:
-      costs[node] = args.cost
-
-    nodes.append(Node(capacity, neighbors, idx=counter, costs=costs))
-    for idx in range(1, args.N):
-      counter += 1
-      neighbors = [0]
-      capacity = args.capacity
-      costs = {0: args.cost}
-      nodes.append(Node(capacity, neighbors, idx=counter, costs=costs))
+    nodes = create_star_topology(N=args.N, capacity=args.capacity,
+                                cost=args.cost)
 
   elif args.topology == "pair":
-    neighbors = [0,2]
-    costs =  {0:0, 2:3}
-    node = Node(capacity=args.capacity, neighbors=neighbors, idx=1, \
-                      costs=costs, serve_cost=8, quick_node=False)
-    nodes.append(node)
-    neighbors = [0, 1]
-    costs = {0:0, 1:3}
-    node = Node(capacity=args.capacity, neighbors=neighbors, idx=2, \
-                costs=costs, serve_cost=1, quick_node=False)
-    nodes.append(node)
+    nodes = create_pair(type=args.network_type, capacity=args.capacity)
+
+  if not args.execute_only:
+
+    interm_episodes = {}
+  for trial in range(args.trials):
+    if not args.execute_only:
+      interm_episodes[trial] = []
+    # set seed
+    random.seed(trial)
+    np.random.seed(trial)
+
+    # ----- initialize agents -----
+    if args.method == "minimaxQ":
+
+      opponent_idxs_1 = [2]
+      opponent_idxs_2 = [1]
+
+      agents = [MinimaxQAgent(nodes=nodes, adv_idxs=opponent_idxs_1,
+                              alpha=args.learning_rate, epsilon=args.epsilon),
+                MinimaxQAgent(nodes=nodes, adv_idxs=opponent_idxs_2,
+                              alpha=args.learning_rate, epsilon=args.epsilon)]
+
+    elif args.method == "Qlearning":
+
+      agents = [QAgent(nodes=nodes, alpha=args.learning_rate,
+                       epsilon=args.epsilon,
+                       adjust_parameters=args.adjust_parameters )]
+
+    elif args.method == "SARSA":
+
+      agents = [SarsaAgent(nodes=nodes, alpha=args.learning_rate,
+                       epsilon=args.epsilon,
+                           adjust_parameters=args.adjust_parameters)]
+
+    elif args.method == "DoubleQ":
+
+      agents = [DoubleAgent(nodes=nodes, alpha=args.learning_rate,
+                       epsilon=args.epsilon,
+                           adjust_parameters=args.adjust_parameters)]
+
+    elif args.method == "RomQ":
+
+      agents = [RomQAgent(nodes=nodes, alpha=args.learning_rate,
+                          epsilon=args.epsilon,
+                          explore_attack=args.explore_attack)]
+
+    if args.execute_only:
+
+      # test intermediate trained agents
+      if args.test_intermediate:
+
+        # find all intermediate files
 
 
-  # ----- initialize agents -----
-  if args.decentralized:
-    agents = []
-    for ag_idx in range(args.N):
-      agent = QAgent(nodes=[nodes[ag_idx]], prob_attack=args.PK,robust=not(args.classical))
-      agents.append(agent)
-  else:
-    agents = [QAgent(nodes=nodes, K=args.K, prob_attack=args.PK,
-                             robust=not(args.classical)) ]
+        agents_for_test = []
+        #config_data = pickle.load( open("../projects/" + args.project +
+        #                                "/config.pkl", "rb"))
 
-  # ----- main learning phase ------
-  performance_train = {"rewards":[], "actions": [], "states": [], "overflows":
-    [], "underflows": []}
-  for episode in range(args.episodes):
-    print("episode", episode)
-    stop_episode = False
+        #interm_episodes = config_data.interm_episodes
+        #episodes_for_test = interm_episodes[trial]
+        #episodes_for_test = episodes_for_test[1:]
+        if args.method == "RomQ":
+          temp_episodes = [82000, 84000, 88000, 84000, 94000, 84000, 92000,
+                           84000]
+        elif args.method == "minimaxQ":
+          temp_episodes = [10000, 10000, 10000, 10000,10000, 10000,10000]
+        else:
+          temp_episodes = [args.episodes]*args.trials
 
-    # reset nodes
-    for agent in agents:
-      nodes = agent.nodes
-      for node in nodes:
-        node.reset()
+        interm_episodes = []
+        for trial_idx, final_episode in enumerate(temp_episodes):
 
-    for iter in range(args.horizon):
+          trial_episodes = np.arange(0, final_episode+1, 2000)
+          interm_episodes.append(trial_episodes)
+        interm_episodes = interm_episodes[trial]
 
-      if stop_episode:
-        break
+        episodes_for_test = interm_episodes
+        episode_dirs = ["../projects/" + args.project + "/trial_" +
+                        str(trial) + "/episode_" + str(episode) for episode
+                        in episodes_for_test]
 
-      # decide whether an attack takes place during training
-      x = random.uniform(0, 1)
-      if x < args.learn_attack_prob:
-        attack = args.K
+        for dir in episode_dirs:
+
+          train_data = pickle.load(open(dir + "/agents.pkl", "rb"))
+
+          agents_for_test.append(train_data["agents"])
+
+
       else:
-        attack = 0
+        if args.method == "RomQ":
+          temp_episodes = [82000, 84000, 88000, 84000, 94000, 84000, 92000,
+                           84000]
+        elif args.method == "minimaxQ":
+          temp_episodes = [10000, 10000, 10000, 10000,10000, 10000,10000]
+        else:
+          temp_episodes = [args.episodes]*args.trials
+        # load saved Qtables
+        train_data = pickle.load(open("../projects/" + args.project +
+                                      "/trial_" + str(trial) + "/episode_" +
+                                      str(temp_episodes[trial]) +
+                                      "/train_data.pkl", "rb"))
 
-      attack_actions = {}
-      if attack > 0:
-        attack_actions = attack(agents)
+        agents = train_data["agents"]
+        agents_for_test = [train_data["agents"]]
+        episodes_for_test = [temp_episodes[-1]]
+        test_trials = list(range(args.trials))
 
-      # find actions performed by agents
-      actions = []
-      for idx, agent in enumerate(agents):
-        actions.extend(agent.execute_policy(attack_actions))
+    else:
+      episodes_for_test = [args.episodes - 1]
 
-      # ----- interaction with the environment -----
-      for agent in agents:
-        nodes = agent.nodes
-        recipients = []
+      # ----- main learning phase ------
 
-        # first find all transmissions
-        served = []
-        for node in nodes:
-          node_idx = node.idx
-          served.append(actions[(node_idx-1)*2])
-          recipient = actions[node_idx*2-1]
-          # map recipient index to actual node
-          recipient = node.neighbors[recipient]
-          recipients.append(recipient)
+      performance_train = {"rewards": [], "actions": [], "states": []}
 
-        # find rewards and new states
-        new_states = []
-        rewards = []
-        arrivals = []
-        departures = []
-        overflows = []
-        underflows = []
-        for node in nodes:
-          node_idx = node.idx
-          recipient = recipients[node_idx-1]
+      sample= 0
+      episode = 0
+      stop_episode = False
 
-          # find how many packets the node has sent to others
-          if recipient:
-            departures.append(1)
+      while sample < args.episodes*args.horizon:
+        sample +=1
+        new_episode = np.floor(sample/args.horizon)
+
+        if (new_episode > episode) or stop_episode:
+          episode = episode + 1
+          change_episode = True
+          print("episode is: ", str(episode), " samples are:", sample)
+        else:
+          change_episode = False
+
+
+        step_rewards = []
+        system_reset = (stop_episode) or (change_episode)
+
+        if system_reset:
+          print("resetting nodes due to:", stop_episode)
+          # reset nodes
+          for agent in agents:
+            nodes = agent.nodes
+            for node in nodes:
+              node.reset()
+            agent.current_state= [0]*len(agent.state_space)
+
+        # interact with the environment
+        actions, rewards, new_states, stop_episode =\
+          env_interact(agents=agents, chigh=args.chigh, clow=args.clow,
+                       utility=args.utility, exploration=True, K=0,
+                       delta=0, attack_type="")
+
+
+        # update agents based on new experience
+        for idx, agent in enumerate(agents):
+
+          if args.method == "minimaxQ":
+            agent_rewards = rewards
+            agent_new_states = new_states
+
+            if 2 in agent.advs_idxs:
+              opponent_action= actions[2:]
+            else:
+              opponent_action = actions[0:2]
+
+            agent.update(next_state=agent_new_states, reward=agent_rewards,
+                         opponent_action=opponent_action)
           else:
-            departures.append(0)
+            agent_new_states = new_states[(idx * len(agent.nodes)):
+                                          (idx * len(agent.nodes) +
+                                           len(agent.nodes))]
 
-          # find how many agents sent a packet to this node
-          arrivals.append(sum([1 for idx,recipient in enumerate(recipients) if
-                          ((recipient==node_idx) and (nodes[idx].load>0))]))
+            agent_rewards = rewards[(idx * len(agent.nodes)):(idx * len(
+              agent.nodes) + len(agent.nodes))]
 
-        for node in nodes:
-          arr = arrivals[node.idx-1]
-          dep = departures[node.idx-1]
-          costs = node.costs
+            agent.update(next_state=agent_new_states,
+                         reward=agent_rewards)
 
-          recipient = recipients[node.idx - 1]
-
-          underflow, overflow = node.transition(arr, dep, served[node.idx-1])
-
-          if overflow:
-            reward = - args.chigh
-            stop_episode = True
-          elif underflow:
-            reward = - args.clow
-          else:
-            reward = args.utility
+        performance_train["rewards"].append(rewards)
+        performance_train["actions"].append(actions)
+        performance_train["states"].append(new_states)
+        step_rewards.append(np.sum(rewards))
 
 
-          # add cost of transmission
-          if recipient:
-            transmission_cost = costs[recipient]
-            reward -= transmission_cost
-          if served[node.idx-1]:
-            reward -= node.serve_cost
 
-          # add cost of execution
-          rewards.append(reward)
-          new_states.append(node.load)
-          overflows.append(overflow)
-          underflows.append(underflow)
-      # update agents based on transitions and rewards
-      for idx, agent in enumerate(agents):
-        agent.update(next_state=new_states[(idx*len(agent.nodes)):(idx*len(
-          agent.nodes) + len(agent.nodes))],
-                     reward=rewards[(idx*len(agent.nodes)):(idx*len(
-          agent.nodes) + len(agent.nodes))])
-      performance_train["rewards"].append(rewards)
-      performance_train["states"].append(new_states)
-      performance_train["actions"].append(actions)
-      performance_train["overflows"].append(overflows)
-      performance_train["underflows"].append(underflows)
+        # save intermediate trained models for testing
+        #print(episode%(args.episodes/10), episode)
+        if (episode%((args.episodes)/5) == 0):
 
-  # ---- main testing phase ----
-  performance_test = {"rewards":[], "actions": [], "states": [],
-                      "overflows": [], "underflows": []}
+          if not os.path.exists("../projects/" + args.project + "/trial_" +
+                                str(trial) + "/episode_" + str(episode)):
 
-  for episode in range(args.test_episodes):
-    stop_episode = False
+            os.makedirs("../projects/" + args.project + "/trial_" + str(trial) +
+                        "/episode_" + str(episode))
 
-    # reset nodes
-    for agent in agents:
-      nodes = agent.nodes
-      for node in nodes:
-        node.reset()
 
-    for iter in range(args.horizon):
-      if stop_episode:
-        break
 
-      # decide whether an attack takes place during testing
-      x = random.uniform(0, 1)
-      if x < args.exec_attack_prob:
-        attack_size = args.K
+          # save agents for reloading Qtables, policies
+          pickle.dump({"agents": agents, "episode": episode,
+                       "episode_samples": sample},
+                      file=open("../projects/" + args.project + "/trial_" +
+                                str(trial) + "/episode_" + str(episode) +
+                                "/agents.pkl", "wb"))
+
+          pickle.dump({"performance_train": performance_train , "agents": agents},
+                      file=open("../projects/" + args.project +
+                      "/trial_" + str(trial) + "/episode_" + str(episode) +
+                           "/train_data" + ".pkl", "wb"))
+          interm_episodes[trial].append(episode)
+
+
+
+          # each file should only contains the episodes after the end of the
+          # previous file
+          performance_train = {"rewards": [], "actions": [], "states": []}
+
+
+    # ---- main testing phase ----
+
+    # find optimal adversarial policy
+    if not args.execute_only:
+      agents_for_test = [agents]
+    test_trials = list(range(args.trials))
+
+    if trial in test_trials:
+
+      if args.execute_only:
+
+        if args.adversary not in ["randoma"]:
+
+          adv_policy = pickle.load(open("../projects/" + args.project + "/policies/adversary_"\
+                           + args.adversary + "/trial_" + str(trial)+
+                           "_adv_policy.pkl", "rb"))
+
+          adv_policy = adv_policy["sigma"]
+        else:
+          adv_policy = 0
       else:
-        attack_size = 0
 
-      attack_actions = {}
-      if attack_size > 0:
-        attack_actions = perform_attack(agents=agents,attack_size = attack_size)
+        adv_policy = find_adversarial_policy(agents, attack_size=args.K)
 
-      # find actions performed by agents
-      actions = []
-      for idx, agent in enumerate(agents):
-        actions.extend(agent.execute_policy(attack_actions, exploration=False))
+        pickle.dump({"sigma": adv_policy},
+                    open("../projects/" + args.project + "/policies/adversary_"\
+                         + args.adversary + "/trial_" + str(trial)+
+                         "_adv_policy.pkl", "wb"))
 
-      # ----- interaction with the environment -----
-      for agent in agents:
-        nodes = agent.nodes
-        recipients = []
+      for agents_idx, agents in enumerate(agents_for_test):
+        episode_train = episodes_for_test[agents_idx]
 
-        # first find all transmissions
-        served = []
-        for node in nodes:
-          node_idx = node.idx
-          served.append(actions[(node_idx - 1) * 2])
-          recipient = actions[node_idx * 2 - 1]
-          # map recipient index to actual node
-          recipient = node.neighbors[recipient]
-          recipients.append(recipient)
+        for current_delta in delta_values:
 
-        # find rewards and new states
-        new_states = []
-        rewards = []
-        arrivals = []
-        departures = []
-        overflows = []
-        underflows = []
-        for node in nodes:
-          node_idx = node.idx
-          recipient = recipients[node_idx - 1]
+          performance_test = {"episode_rewards": [], "actions": [],
+                              "states": [], "current_states": [],
+                              "sample_rewards": [],
+                           "episodes_duration": []}
 
-          # find how many packets the node has sent to others
-          if recipient:
-            departures.append(1)
-          else:
-            departures.append(0)
+          for episode in range(args.test_episodes):
+            stop_episode = False
+            step_rewards = []
+            duration = 0
 
-          # find how many agents sent a packet to this node
-          arrivals.append(
-            sum([1 for idx, recipient in enumerate(recipients) if
-                 ((recipient == node_idx) and (nodes[idx].load > 0))]))
+            # reset nodes
+            for agent in agents:
+              nodes = agent.nodes
+              for node in nodes:
+                node.reset()
 
-        for node in nodes:
-          arr = arrivals[node.idx - 1]
-          dep = departures[node.idx - 1]
-          costs = node.costs
+            for iter in range(args.horizon):
 
-          recipient = recipients[node.idx - 1]
-          underflow, overflow = node.transition(arr, dep,
-                                                served[node.idx - 1])
+              if stop_episode:
+                break
 
-          if overflow:
-            reward = - args.chigh
-            stop_episode = True
-          elif underflow:
-            reward = - args.clow
-          else:
-            reward = args.utility
+              duration += 1
 
-          # add cost of transmission
-          if recipient:
-            transmission_cost = costs[recipient]
-            reward -= transmission_cost
-          if served[node.idx - 1]:
-            reward -= node.serve_cost
+              current_state = []
+              for node in nodes:
+                current_state.append(node.load)
 
-          # add cost of execution
-          rewards.append(reward)
-          new_states.append(node.load)
-          overflows.append(overflow)
-          underflows.append(underflow)
+              actions, rewards, new_states, stop_episode =\
+                env_interact(agents=agents, chigh=args.chigh, clow=args.clow,
+                             utility=args.utility, exploration=False, K=args.K,
+                             delta=current_delta, current_state=current_state,
+                             adversarial_policy=adv_policy,
+                             attack_type=args.attack_type)
 
-      # update agents based on transitions and rewards
-      for idx, agent in enumerate(agents):
-        agent.update(
-          next_state=new_states[(idx * len(agent.nodes)):(idx * len(
-            agent.nodes) + len(agent.nodes))], reward=None, learn=False)
+              # update agents based on transitions and rewards
+              for idx, agent in enumerate(agents):
 
-      performance_test["rewards"].append(rewards)
-      performance_test["states"].append(new_states)
-      performance_test["actions"].append(actions)
-      performance_test["overflows"].append(overflows)
-      performance_test["underflows"].append(underflows)
+                if args.method == "minimaxQ":
+                  opponent_action = [actions[(adv_idx-1)*2] for adv_idx in
+                                     agent.advs_idxs]
 
-  pickle.dump([performance_train, performance_test, args], file=open(
-    "../projects/" +  args.project + "/experiment_data.pkl","wb"))
+                  opponent_action.extend([actions[(adv_idx-1)*2+1] for adv_idx in
+                                          agent.advs_idxs])
 
+                  agent.update(next_state=new_states, reward=None,
+                               opponent_action=opponent_action,
+                               learn=False)
+                else:
+
+                  agent.update(next_state=new_states[(idx * len(agent.nodes)):(idx * len(
+                    agent.nodes) + len(agent.nodes))], reward=None, learn=False)
+
+              step_rewards.append(np.sum(rewards))
+
+              performance_test["states"].append(new_states)
+              performance_test["actions"].append(actions)
+              performance_test["current_states"].append(current_state)
+
+
+            performance_test["episode_rewards"].append(np.sum(step_rewards))
+            performance_test["episodes_duration"].append(duration)
+
+          test_dir = "../projects/" + args.project + "/trial_" +  str(trial) +\
+                     "/episode_" + str(episode_train) + "/adversary_" +\
+                     args.adversary + "_attack_" + args.attack_type + "/data"
+          if not os.path.exists(test_dir):
+            os.makedirs(test_dir)
+
+          # save test data
+          pickle.dump({"performance_test": performance_test},  file=open(
+            test_dir+"/test_data_" +  str(current_delta) + ".pkl", "wb"))
+
+
+
+  if not args.execute_only:
+    for key, val in interm_episodes.items():
+      val = list(set(val))
+      interm_episodes[key] = val
+    print(interm_episodes)
+    args.interm_episodes = interm_episodes
+    pickle.dump(args, open("../projects/" + args.project + "/config.pkl", "wb"))
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
@@ -351,23 +411,54 @@ if __name__ == '__main__':
   parser.add_argument('--clow',
                         help='Punishment for underflow',
                         type=int,
-                        default=7)
+                        default=0)
+
+  parser.add_argument('--execute_only',
+                      help='Execute policy without learning',
+                      default=False,
+                      action="store_true")
+
+  parser.add_argument('--explore_attack',
+                      help='Explore sub-optimal attacks (only for Rom-Q)',
+                      default=0,
+                      type=float)
+
+  parser.add_argument('--adjust_parameters',
+                      help='Adjust learning hyperparameters at each iteration.',
+                      default=False,
+                      action="store_true")
+
+  parser.add_argument('--test_intermediate',
+                      help='Indicates whether testing should evaluate all '
+                           'intermediate trained agents.  ',
+                      default=False,
+                      action="store_true")
 
   parser.add_argument('--chigh',
                         help='Punishment for overflow',
                         type=int,
-                        default=20)
+                        default=100)
 
   parser.add_argument('--utility',
-                      help='Utility for executing a packet',
+                      help='Utility for executing a pack2et',
                       type=int,
-                      default=5)
+                      default=8)
 
   parser.add_argument('--cost',
                       help='Cost of transmitting on an edge',
                       type=int,
                       default=0)
 
+  parser.add_argument('--agents_file',
+                      help='Name of file containing trained agents.',
+                      type=str,
+                      default="")
+
+  parser.add_argument('--attack_type',
+                      help='Choose betweetn randoma, randomb, randomc and '
+                           'worst.',
+                      type=str,
+                      default="worst")
 
   parser.add_argument('--K',
                       help='Number of adversaries',
@@ -390,6 +481,16 @@ if __name__ == '__main__':
                       type=float,
                       default=0)
 
+  parser.add_argument('--learning_rate',
+                      help='Learning rate for temporal difference learning.',
+                      type=float,
+                      default=0.01)
+
+  parser.add_argument('--epsilon',
+                      help='Exploration rate for temporal difference learning.',
+                      type=float,
+                      default=0.1)
+
   parser.add_argument('--capacity',
                       help='Capacity of nodes',
                       type=int,
@@ -399,6 +500,28 @@ if __name__ == '__main__':
                       help='Number of iterations in episode',
                       type=int,
                       default=8)
+
+  parser.add_argument('--trials',
+                      help='Number of Monte Carlo trials.',
+                      type=int,
+                      default=10)
+
+  parser.add_argument('--method',
+                      help='Indicates the learning method used. Choose '
+                           'between Qlearning, SARSA, minimaxQ and RomQ.',
+                      type=str,
+                      default="Qlearning")
+
+  parser.add_argument('--adversary',
+                      help='Choose adversarial policy. Choices are Qlearning '
+                           ' minimaxQ and RomQ.',
+                      type=str,
+                      default="Qlearning")
+
+  parser.add_argument('--romq',
+                      help='Indicates if ROM-Q is used.',
+                      type=int,
+                      default=0)
 
   parser.add_argument('--episodes',
                       help='Number of learning episode',
@@ -436,6 +559,16 @@ if __name__ == '__main__':
                            'star.',
                       type=str,
                       default="ring")
+
+  parser.add_argument('--network_type',
+                      help='Type of network. Choose between A, B and C.',
+                      type=str,
+                      default="A")
+
+  parser.add_argument('--seed',
+                      help='Seed used for generating random numbers.',
+                      type=int,
+                      default=0)
 
   args = parser.parse_args()
   main(args)
