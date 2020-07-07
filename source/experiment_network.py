@@ -1,5 +1,4 @@
 """ Main interface script for executing an experiment.
-
 """
 # ----- generic imports ----
 import os
@@ -19,7 +18,6 @@ from parser import *
 def main(args):
 
   # ----- set up -----
-
   # create project sub-directories
   policies_dir = "../projects/" + args.project + "/policies/adversary_" \
                  + args.adversary
@@ -32,17 +30,16 @@ def main(args):
     os.makedirs(plots_dir)
 
   for trial in range(args.trials):
+
     trial_plots_dir = "../projects/" + args.project + "/trial_" +  str(trial) +\
                       "/adversary_" + args.adversary + "_attack_" + \
                       args.attack_type + "/plots"
-
     if not os.path.exists(trial_plots_dir):
       os.makedirs(trial_plots_dir)
 
     trial_data_dir = "../projects/" + args.project + "/trial_" + str(trial) + \
                       "/adversary_" + args.adversary + "_attack_" + \
                       args.attack_type + "/data"
-
     if not os.path.exists(trial_data_dir):
       os.makedirs(trial_data_dir)
 
@@ -51,17 +48,16 @@ def main(args):
   delta_values = [0]
   delta_values.extend(np.arange(start=0.1, stop=max_delta + 0.01, step=0.1))
   args.delta_values = delta_values
-  
   payoffs = {"overflow": args.chigh, "underflow": args.clow,
              "alive": args.utility}
 
-
-  interm_epochs = {}
-  args.orig_project = args.project
   # change project directory for evaluation
+  args.orig_project = args.project
+  interm_epochs = {}
   if args.evaluate:
     args.project = args.orig_project + "/eval" + "/adv_" + str(
     args.determ_adv) + "def_" + str(args.determ_execution)
+
   for trial in range(args.trials):
     interm_epochs[trial] = []
 
@@ -114,8 +110,10 @@ def main(args):
       stop_episode = False
       epoch = 0
       control_nodes = []
+
       for agent in agents:
         control_nodes.extend(agent.control_nodes)
+
       while sample < (args.train_samples+1):
         
         new_episode = np.floor(sample/args.horizon)
@@ -135,7 +133,6 @@ def main(args):
           # reset all nodes of the MAS
           for agent in agents:
             agent.current_state = [0]*len(agent.state_space)
-
           for node in control_nodes:
               node.reset()
 
@@ -144,8 +141,7 @@ def main(args):
           env_interact(agents=agents, payoffs = payoffs, evaluation=False,
                        attack_size=0, prob_attack=0, attack_type="worst")
 
-
-        # update agents based on new experience
+        # ----- update agents based on new experience -----
         for idx, agent in enumerate(agents):
 
           # find opponent actions
@@ -158,9 +154,7 @@ def main(args):
             opponent_action.extend([exec_action, off_action])
 
           agent_new_states = new_states
-
           agent_rewards = rewards
-
           agent.update(next_state=agent_new_states, reward=agent_rewards,
                        opponent_action=opponent_action)
 
@@ -169,15 +163,13 @@ def main(args):
         performance_train["states"].append(new_states)
 
         # save intermediate trained models for evaluation
-        if (sample%((args.train_samples)/5) == 0):
+        if sample%((args.train_samples)/5) == 0:
 
           # create directory for intermediate episode
           if not os.path.exists("../projects/" + args.project + "/trial_" +
                                 str(trial) + "/epoch_" + str(epoch)):
-
             os.makedirs("../projects/" + args.project + "/trial_" + str(trial) +
                         "/epoch_" + str(epoch))
-
 
           # save performance and agents for further analysis
           pickle.dump({"performance": performance_train,
@@ -190,16 +182,12 @@ def main(args):
 
           # clear data for memory management
           performance_train = {"rewards": [], "actions": [], "states": []}
-          print("Samples executed so far:", sample, " for epoch ", epoch)
           epoch += 1
 
         sample += 1
 
-      #interm_epochs[trial].append(epoch)
-        
-      # save adversarial policy
+      # ----- save adversarial policy -----
       adv_policy = find_adversarial_policy(agents, attack_size=args.K)
-
       if args.determ_adv:
         policies_dir = "../projects/" + args.project + \
                        "/policies/adversary_" + args.adversary + "/determ"
@@ -212,8 +200,7 @@ def main(args):
                 open( policies_dir + "/trial_" + str(trial)+
                       "_adv_policy.pkl", "wb"))
 
-    #print("total samples executed: ", sample)
-    # ---- main testing phase ----
+    # ---- main evaluation phase ----
     if args.evaluate:
 
       if not os.path.exists("../projects/" + args.project):
@@ -253,6 +240,7 @@ def main(args):
       adv_policies_for_eval = []
       for dir in episode_dirs:
         train_data = pickle.load(open(dir + "/train_data.pkl", "rb"))
+
         agents = []
         for agent in train_data["agents"]:
           agent.determ_execution = args.determ_execution
@@ -260,15 +248,12 @@ def main(args):
         agents_for_eval.append(agents)
 
         if args.adversarial_interm:
-          new_adv_policy = find_adversarial_policy(agents,
-                                                      attack_size=args.K)
+          new_adv_policy = find_adversarial_policy(agents, attack_size=args.K)
           adv_policies_for_eval.append(new_adv_policy)
           pickle.dump({"sigma": new_adv_policy},
                       open(dir + "/adv_policy.pkl", "wb"))
         else:
           adv_policies_for_eval.append(adv_policy)
-
-
 
       for agents_idx, agents in enumerate(agents_for_eval):
         train_epoch = epochs_for_eval[agents_idx]
@@ -282,9 +267,11 @@ def main(args):
           episode = 0
           stop_episode = False
           duration = 0
-          control_nodes= []
+
+          control_nodes = []
           for agent in agents:
             control_nodes.extend(agent.control_nodes)
+
           while sample < args.eval_samples:
             sample += 1
             duration += 1
@@ -337,9 +324,7 @@ def main(args):
                 opponent_action.extend([exec_action, off_action])
 
               agent_new_states = new_states
-
               agent_rewards = rewards
-
               agent.update(next_state=agent_new_states, reward=agent_rewards,
                            opponent_action=opponent_action, learn=False)
 
@@ -348,13 +333,14 @@ def main(args):
             performance_test["current_states"].append(current_state)
             performance_test["rewards"].append(np.sum(rewards))
 
+
+          # ----- save evaluation data -----
           test_dir = "../projects/" + args.project + "/trial_" +  str(trial) +\
                      "/epoch_" + str(train_epoch) + "/adversary_" +\
                      args.adversary + "_attack_" + args.attack_type + "/data"
           if not os.path.exists(test_dir):
             os.makedirs(test_dir)
 
-          # save test data
           nodes = []
           for agent in agents:
             nodes.extend(agent.control_nodes)
@@ -372,12 +358,10 @@ def main(args):
     config.interm_epochs = interm_epochs
   else:
     config = pickle.load(open("../projects/" + args.orig_project +
-                              "/config.pkl",
-                              "rb"))
+                              "/config.pkl", "rb"))
     config.delta_values = delta_values
 
-
-  # add debugging data to config
+  # add logged data to config pickle
   logs = []
   for agent in agents:
     logs.append(agent.log)

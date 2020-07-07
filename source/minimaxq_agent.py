@@ -14,7 +14,7 @@ from tools import *
 class MinimaxQAgent(Agent):
   """ An agent that uses minimax-Q.
 
-  Nodes are divided into defenders and opponents, and a policy is learnt over
+  Nodes are divided into defenders and opponents, and a policy is learned over
   the joint action space of defenders. By creating a different MinimaxQAgent
   for each node, where all others are opponents, we can learn a different
   policy for each node.
@@ -66,11 +66,12 @@ class MinimaxQAgent(Agent):
       next_state (list of int): contains individual node loads
       learn (bool): indicates whether the Q-table will be updated
     """
+
     # ----- map opponent action to relative idxs -----
     trans_action = opponent_action
     opp_idxs = [node.idx for node in self.nodes if node not in
                                                   self.control_nodes]
-    nodes_idxs = [node.idx for node in self.nodes]
+
     for idx, action in enumerate(opponent_action):
       if idx%2 != 0: # only off-loading actions require mapping
 
@@ -123,7 +124,6 @@ class MinimaxQAgent(Agent):
       current_entry[idx] = el
     qtable = self.Qtable[tuple(current_entry)]
 
-
     num_a = len(self.control_nodes) * 4
     num_o = (len(self.nodes) - len(self.control_nodes)) * 4
     
@@ -136,10 +136,6 @@ class MinimaxQAgent(Agent):
       map[count] = pos
       map[count + 1] = pos + 1
       count += 1
-    # for defend in self.control_nodes:
-    #   pos = self.nodes.index(defend)
-    #   map[count] = pos
-    #   count += 1
 
     for key, value in map.items():
       qtable = np.swapaxes(qtable, key, value)
@@ -182,7 +178,6 @@ class MinimaxQAgent(Agent):
 
     if self.determ_execution and deployment:
       # ----- execute deterministic policy during deployment -----
-
       # get q-values for current state
       current_entry = [slice(None)] * len(self.state_space)
       for idx, el in enumerate(self.current_state):
@@ -210,7 +205,6 @@ class MinimaxQAgent(Agent):
 
     else:
       rand = np.random.rand()
-
       flat_pi = np.ndarray.flatten(policy)
       cumSumProb = np.cumsum(flat_pi)
 

@@ -1,6 +1,6 @@
-""" This script contains various functions that help throughout the
-project. Functions include solving a linear
+""" Contains various misc. functions, used throught a simulation.
 """
+
 # ----- generic imports -----
 import random
 import itertools
@@ -16,17 +16,19 @@ from node import *
 def solve_LP(num_a, num_o, game_table):
   """ Solves a linear program.
 
-  We assume that the game_table has opponent actions as a first dimension.
+  We assume that the game matrix has opponent actions as a first dimension.
+
   Args:
     num_a (int): number of player's actions
     num_o (int): number of opponent's actions
-    game_table (array of float): a table of dimension (num_o x num_a)
+    game_table (array of float): the game matrix, a table of dimension (num_o x
+    num_a)
     containing the values of different outcomes of the game
 
   Returns: the solution of the linear program, containing both the value and
-  the policy
-  """
-    # defines optimization objective
+  the policy   """
+
+  # defines optimization objective
   c = np.zeros((num_a + 1, 1))
   c[0] = -1
 
@@ -175,7 +177,6 @@ def find_adversarial_policy(agents, attack_size):
 
       # add all qtables (each one corresponds to a different combination of
       # the actions of defenders)
-
       total_qdefend = np.zeros(qcurrent[tuple(current_action)].shape)
       for table in qdefend:
         total_qdefend = np.add(total_qdefend, table)
@@ -194,9 +195,6 @@ def find_adversarial_policy(agents, attack_size):
       def_qtable = qcurrent[tuple(act_entry)]
       adv_action = np.argmin(def_qtable)
       adv_action = list(np.unravel_index(adv_action, def_qtable.shape))
-      adv_idx = advers[0]
-      # if adv_action == [def_actions[adv_idx*2], def_actions[adv_idx*2+1]]:
-      #   print("equal")
       value = np.min(def_qtable)
 
       # keep worst partition
@@ -290,13 +288,9 @@ def perform_attack(adversarial_policy, current_state, attack_size,
     adversarial_actions = adversarial_policy[1]
     state_size = len(current_state)
 
-    if state_size > 4:
-      print("oops")
-
     current_entry = [slice(None)] * state_size
     for idx, el in enumerate(current_state):
       current_entry[idx] = el
-
 
     state_adv_nodes = adversarial_nodes[tuple(current_entry)]
     state_adv_actions = adversarial_actions[tuple(current_entry)]
@@ -349,6 +343,7 @@ def env_interact(agents, prob_attack, payoffs, attack_size,
 
     actions.extend(agent_actions)
     nodes.extend(agent.control_nodes)
+
   # ----- perform one interaction with the environment -----
   recipients = []
   executed = []
@@ -457,7 +452,7 @@ def create_pair(network_type, capacity):
     spawn_rate_1 = 0
     spawn_rate_2 = 0.7
 
-  elif type == "C":
+  elif network_type == "C":
     costs_1 = {0: 0, 2: 3}
     costs_2 = {0: 0, 1: 3}
     serve_cost_1 = 8
@@ -482,7 +477,6 @@ def create_pair(network_type, capacity):
     spawn_rate_1 = 0.5
 
   nodes = []
-
   neighbors = [0, 2]
   node = Node(capacity=capacity, neighbors=neighbors, idx=1, off_costs=costs_1,
               exec_cost=serve_cost_1, gen_rate=spawn_rate_1)

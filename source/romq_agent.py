@@ -1,4 +1,4 @@
-""" Contains the implementation of a Q-learning agent."""
+""" Contains the implementation of a RomQ-learning agent."""
 
 # ----- generic imports -----
 import numpy as np
@@ -10,9 +10,8 @@ import itertools
 from agent import *
 from tools import *
 
-
 class RomQAgent(Agent):
-  """ An agent that uses minimax-Q.
+  """ An agent that uses RomQ-learning.
 
   Nodes are divided into defenders and opponents, and a policy is learnt over
   the joint action space of defenders. By creating a different MinimaxQAgent
@@ -29,7 +28,6 @@ class RomQAgent(Agent):
     attack_size (int): number of adversaries considered to compute target
       policy
   """
-
 
   def __init__(self, nodes, epsilon, alpha, gamma, explore_attack,
                determ_execution, attack_size):
@@ -65,7 +63,7 @@ class RomQAgent(Agent):
     self.attack_size = attack_size
 
     # initialize data for logging
-    self.log["defenders"] = [] # which nodes have been chosen as adversaries
+    self.log["defenders"] = []
 
   def update(self, reward, next_state, opponent_action, learn=True):
     """ Updates an agent after interaction with the environment.
@@ -89,7 +87,6 @@ class RomQAgent(Agent):
     Args:
       next_state (list of int): contains individual node loads
     """
-
     return self.V[tuple(next_state)]
 
   def update_policy(self, retry=False):
@@ -146,10 +143,6 @@ class RomQAgent(Agent):
         map[count] = pos
         map[count + 1] = pos + 1
         count += 1
-      # for defend in [node for node in self.nodes if node not in opp_nodes]:
-      #   pos = self.nodes.index(defend)
-      #   map[count] = pos
-      #   count += 1
 
       for key, value in map.items():
         qtable = np.swapaxes(qtable_state, key, value)
@@ -181,12 +174,7 @@ class RomQAgent(Agent):
 
     self.V[tuple(current_entry)] = minV
 
-    if min_policy.shape == (0,):
-      print("pause")
-
     self.policies[min_def-1][tuple(current_entry)] = min_policy
-
-    #self.log["defenders"].append(min_def-1)
 
   def onpolicy_action(self, deployment):
     """ Performs the on-policy action.
@@ -212,7 +200,6 @@ class RomQAgent(Agent):
 
     else:
       # ----- execute probabilistc policy during training and deployment -----
-
       self.current_action = []
       for idx, node in enumerate(self.nodes):
 
@@ -224,7 +211,6 @@ class RomQAgent(Agent):
 
         # randomly sample policy
         rand = np.random.rand()
-
         flat_pi = np.ndarray.flatten(current_policy)
         cumSumProb = np.cumsum(flat_pi)
 

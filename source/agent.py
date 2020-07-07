@@ -18,27 +18,35 @@ class Agent:
   for centralized and joint learners. Independent learners should override
   the __init__ function and define the state-action space accordingly.
 
-  Note: Do not create objects of this class, it is only an interface.
+  Note: This is an interface, do not create objects of this class.
 
   Attributes:
     state_space (tuple of int): the dimensions of the state space. each node
     of the MAS is another dimension
+
     action_space (tuple of int): the dimensions of the action space. each node
     controlled by the agent contributes two dimensions (execute and off-load)
+
     learn_space (tuple of int): the dimensions of the Q-table
+
     Qtable (array of float): an array of dimension learn_space
+
     nodes (list of Node): all nodes of the MAS
+
     current_state (list of int): of dimension state_space
+
     current_action (list of int): the action the agent intends to execute in
     the next step
+
     learn_parameters (dict of str: float): contains the values of different
      hyperparameters including learning rate, discount factor, exploration rate
+
     log (dict of values): used for logging information for debugging and
      plotting
   """
 
   def __init__(self, nodes, epsilon, alpha, gamma):
-    """ Initializes a generic agent.
+    """ Initializes an agent.
 
     Args:
       nodes (list of :obj:`Node`): nodes comprising the MAS
@@ -71,15 +79,11 @@ class Agent:
     self.current_state = [0] * len(nodes)  # initial state
     self.current_action = [0, 0] * len(nodes)
 
-
-
     # initialize learning parameters
     self.learn_parameters = {"epsilon": epsilon, "alpha": alpha, "gamma": gamma}
 
     # initialize dictionary for logging
     self.log = {"updates": []}
-
-
 
   def execute_policy(self, attack_actions, evaluation=False):
     """ Choose the action to perform based on the policy, the exploration
@@ -101,8 +105,8 @@ class Agent:
     Returns:
       a list of actions to execute, where indexes are absolute
     """
-    # ----- execute e-greedy policy -----
 
+    # ----- execute e-greedy policy -----
     x = random.uniform(0, 1)
     if ((x < self.learn_parameters["epsilon"]) and not(evaluation)):
 
@@ -128,12 +132,6 @@ class Agent:
 
         # map to position in current_action
         rel_key = control_abs_idxs.index(abs_key)
-
-        # sanity check
-        # if self.current_action[rel_key * 2] == value[0] and \
-        #     self.current_action[rel_key * 2 + 1] == value[1]:
-        #   print("adversary agrees with defender")
-
         self.current_action[rel_key * 2] = value[0]
         self.current_action[rel_key * 2 + 1] = value[1]
 
@@ -167,7 +165,7 @@ class Agent:
     # update Q-value
     td_error = sum(reward) + self.learn_parameters["gamma"] * target - Qcurrent
     self.Qtable[current_entry] = Qcurrent +\
-                                 self.learn_parameters["alpha"] * (td_error)
+                                 self.learn_parameters["alpha"] * td_error
 
   def update(self, reward, next_state, learn, opponent_action=[]):
     """ Updates an agent after interaction with the environment.
