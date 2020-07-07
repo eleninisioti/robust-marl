@@ -1,28 +1,58 @@
 #!/bin/bash
 
 # ----- training -----
-#python3 experiment_network.py --episodes 10000 --horizon 50 --epsilon 0.1 --learning_rate 0.01 --project samples_final/minimaxQ --trials 10  --exec_attack_prob 1 --method minimaxQ --test_episodes 1000 --topology pair --K 1 --N 2 --capacity 3 --network_type D --adversary minimaxQ
+#python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary minimaxQ --topology pair --capacity 3 --network_type D --train_samples 1000000 --determ_execution --determ_adv
 
-
-# ----- copy learned policies for tournament -----
-#cp -r ../projects/samples_final/minimaxQ/policies/adversary_minimaxQ ../projects/samples_final/RomQ/policies/adversary_minimaxQ
-#cp -r ../projects/samples_final/minimaxQ/policies/adversary_minimaxQ ../projects/samples_final/Qlearning/policies/adversary_minimaxQ
+# ----- DETERM VS DETERM -----
 
 # ----- evaluate optimal policies ----
-#python3 experiment_network.py --episodes 10000 --horizon 50 --epsilon 0.1 --learning_rate 0.01 --project samples_final/minimaxQ --trials 7  --exec_attack_prob 1 --method minimaxQ --test_episodes 1000 --topology pair --K 1 --N 2 --capacity 3 --network_type D --execute_only --adversary minimaxQ
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary minimaxQ_determ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --eval_attack_prob 1 --determ_execution --determ_adv
+
+#python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary Qlearning --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --eval_attack_prob 1 --determ_execution --determ_adv
+
+#python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary RomQ_determ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --eval_attack_prob 1 --determ_execution --determ_adv
 
 
-#python3 experiment_network.py --episodes 10000 --horizon 50 --epsilon 0.1 --learning_rate 0.01 --project samples_final/minimaxQ --trials 7  --exec_attack_prob 1 --method minimaxQ --test_episodes 1000 --topology pair --K 1 --N 2 --capacity 3 --network_type D --execute_only --adversary Qlearning
+# ----- evalute intermediate policies -----
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary minimaxQ_determ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --evaluate_interm --eval_attack_prob 1 --determ_execution --determ_adv
 
-#python3 experiment_network.py --episodes 10000 --horizon 50 --epsilon 0.1 --learning_rate 0.01 --project samples_final/minimaxQ --trials 7  --exec_attack_prob 1 --method minimaxQ --test_episodes 1000 --topology pair --K 1 --N 2 --capacity 3 --network_type D --execute_only --adversary RomQ
+#python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary Qlearning --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --evaluate_interm --eval_attack_prob 1 --determ_execution --determ_adv
+
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary RomQ_determ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --evaluate_interm --eval_attack_prob 1 --determ_execution --determ_adv
 
 
-# ----- evaluate intermediate policies ----
-python3 experiment_network.py --episodes 10000 --horizon 50 --epsilon 0.1 --learning_rate 0.01 --project samples_final/minimaxQ --trials 7  --exec_attack_prob 1 --method minimaxQ --test_episodes 1000 --topology pair --K 1 --N 2 --capacity 3 --network_type D --execute_only --test_intermediate --adversary minimaxQ
+# ----- PROB VS PROB -----
+echo "Beginning prob vs prob"
+# ----- evaluate optimal policies ----
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary minimaxQ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --eval_attack_prob 1 
+
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary Qlearning --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --eval_attack_prob 1 
+
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary RomQ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --eval_attack_prob 1 
 
 
-python3 experiment_network.py --episodes 10000 --horizon 50 --epsilon 0.1 --learning_rate 0.01 --project samples_final/minimaxQ --trials 7  --exec_attack_prob 1 --method minimaxQ --test_episodes 1000 --topology pair --K 1 --N 2 --capacity 3 --network_type D --execute_only --test_intermediate --adversary Qlearning
+# ----- evalute intermediate policies -----
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary minimaxQ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --evaluate_interm --eval_attack_prob 1 
 
-python3 experiment_network.py --episodes 10000 --horizon 50 --epsilon 0.1 --learning_rate 0.01 --project samples_final/minimaxQ --trials 7  --exec_attack_prob 1 --method minimaxQ --test_episodes 1000 --topology pair --K 1 --N 2 --capacity 3 --network_type D --execute_only --test_intermediate --adversary RomQ
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary Qlearning --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --evaluate_interm --eval_attack_prob 1 
 
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary RomQ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --evaluate_interm --eval_attack_prob 1 
+
+
+# ----- DETERM VS PROB -----
+
+# ----- evaluate optimal policies ----
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary minimaxQ_determ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --eval_attack_prob 1 --determ_adv
+
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary Qlearning --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --eval_attack_prob 1 --determ_adv
+
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary RomQ_determ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --eval_attack_prob 1 --determ_adv
+
+
+# ----- evalute intermediate policies -----
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary minimaxQ_determ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --evaluate_interm --eval_attack_prob 1 --determ_adv
+
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary Qlearning --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --evaluate_interm --eval_attack_prob 1 --determ_adv
+
+python3 experiment_network.py --project refactor/minimaxQ --trials 10 --method minimaxQ --adversary RomQ_determ --topology pair --capacity 3 --network_type D --eval_samples 10000 --evaluate --evaluate_interm --eval_attack_prob 1 --determ_adv
 

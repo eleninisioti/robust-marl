@@ -1,48 +1,54 @@
 """ This script can be used to plot the adversarial policy
 
 """
+# ----- generic imports
 import pickle
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FormatStrFormatter
-import matplotlib
-import numpy as np
 import seaborn
 import sys
+
+# ----- project-specific imports -----
 sys.path.insert(0,"../source")
 from q_agent import *
-import pandas as pd
 
 # ----- set up -----
-seaborn.set()
+# parse input
 project = sys.argv[1]
-adversaries = [sys.argv[2]]
+adversary = sys.argv[2]
+plot_interm = sys.argv[3] # indicates whethet to plot intermediate policies
+
+# set up for plots
+seaborn.set()
+symbols = {"Qlearning": "Q", "minimaxQ": "M", "RomQ": "R"}
 
 # load project data
-#config = pickle.load(open("../projects/" + project + "/config.pkl",  "rb"))
-capacity = 3
-trials = 4
-symbols = {"Qlearning": "Q", "minimaxQ": "M", "RomQ": "R"}
+config = pickle.load(open("../projects/" + project + "/config.pkl",  "rb"))
+capacity = config.capacity
+trials = config.trials
 
 for trial in range(trials):
 
-  for adv_idx, adversary in enumerate(adversaries):
+  if plot_interm:
 
-    adversary_file = "../projects/" + project + "/policies/adversary_" + \
-                     adversary + "/trial_" + str(trial) + "_adv_policy.pkl"
-    print(adversary_file)
+    epochs = config.interm_epochs[trial]
+    adversary_dirs = []
+    for epoch in epochs:
+      adversary_dirs.append("../projects/" + project + "/trial_" + str(
+        trial) + "/epoch_" + str(epoch) )
+  else:
+    adversary_dirs = ["../projects/" + project + "/policies/adversary_" + \
+                   adversary + "/trial_" + str(trial) ]
 
-    plots_dir =  "../projects/" + project + "/policies/adversary_" + \
-                     adversary
+  for dir in adversary_dirs:
 
+    plots_dir = dir
+    adversary_file = dir + "/adv_policy.pkl"
     adv_policy = pickle.load(open(adversary_file, "rb"))
     adv_policy = adv_policy["sigma"]
     adv_nodes = adv_policy[0]
     adv_actions = adv_policy[1]
 
-    #print(adv_policy[0])
-
-
-    # plot state space
+    # plot state visits
     grid = np.ones(shape=(capacity+2, capacity+2))
     img = plt.imshow(grid.T, origin="lower", cmap="gray", vmin=0, vmax=1.5)
     plt.xlabel("$s_1$", color="green")
@@ -60,8 +66,6 @@ for trial in range(trials):
         current_entry = [slice(None)] * len(current_state)
         for idx, el in enumerate(current_state):
           current_entry[idx] = el
-
-        print(adv_nodes[tuple(current_entry)])
 
         current_node = int(adv_nodes[tuple(current_entry)][0])
         current_actions = adv_actions[tuple(current_entry)]

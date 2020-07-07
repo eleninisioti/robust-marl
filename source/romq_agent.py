@@ -1,214 +1,239 @@
 """ Contains the implementation of a Q-learning agent."""
 
+# ----- generic imports -----
 import numpy as np
 import random
 import math
 import itertools
 
+# ----- project-specific imports -----
 from agent import *
 from tools import *
 
+
 class RomQAgent(Agent):
+  """ An agent that uses minimax-Q.
+
+  Nodes are divided into defenders and opponents, and a policy is learnt over
+  the joint action space of defenders. By creating a different MinimaxQAgent
+  for each node, where all others are opponents, we can learn a different
+  policy for each node.
+
+  Attributes:
+    control_nodes (list of Node): the nodes whose actions are controlled
+    determ_execution (bool): indicates whether execution of policies during
+       deployment should be deterministic
+    V (array of float): an array of dimension state_space
+    explore_attack (float): the probability with which random adversaries,
+      instead of worst-case, are chosen
+    attack_size (int): number of adversaries considered to compute target
+      policy
+  """
 
 
+  def __init__(self, nodes, epsilon, alpha, gamma, explore_attack,
+               determ_execution, attack_size):
+    """ Initialize Rom-Q agent.
 
-  def __init__(self, nodes, epsilon=0.01, alpha=0.1, gamma=0.9,
-               temperature=0.01, decay=1, explore_attack=False):
+    Args:
+      opp_idxs (list of int): absolute indexes of opponents
+      explore_attack (float): the probability with which random adversaries,
+      instead of worst-case, are chosen
+      determ_execution (bool): indicates whether execution of policies during
+       deployment should be deterministic
+      attack_size (int): number of adversaries considered to compute target
+      policy
+    """
 
-    super().__init__(nodes, epsilon, alpha, gamma,
-                   temperature)
+    super().__init__(nodes=nodes, epsilon=epsilon, alpha=alpha, gamma=gamma)
 
-    self.decay = decay
     self.control_nodes = nodes
-    self.defenders = [node.idx for node in nodes]
-    self.explore_attack = explore_attack
-
-    self.selection_first = 0
-    self.selections_first = []
-    self.selection_second = 0
-    self.selections_second = []
-    self.ties = 0
 
     # initialize policies
     self.policies = []
     for node in self.nodes:
       policy_action_space = [2, len(node.neighbors)]
-      policy_space = self.state_space + policy_action_space
+      policy_space = self.state_space + tuple(policy_action_space)
       self.policies.append(np.ones(tuple(policy_space)) / np.sum(
       policy_action_space))
 
     # initialize value function
     self.V = np.random.uniform(low=0, high=0.0001, size=tuple(self.state_space))
-    current_entry = [slice(None)] * len(self.state_space)
 
-    for s1 in range(self.nodes[0].capacity + 2):
-      for s2 in range(self.nodes[1].capacity + 2):
-        if s1 == 4 or s2 == 4:
-          current_entry[0] = s1
-          current_entry[1] = s2
-          self.V[tuple(current_entry)] = -100
+    self.explore_attack = explore_attack
+    self.determ_execution = determ_execution
+    self.attack_size = attack_size
 
+    # initialize data for logging
+    self.log["defenders"] = [] # which nodes have been chosen as adversaries
 
-  def update(self, reward, next_state, learn=True):
+  def update(self, reward, next_state, opponent_action, learn=True):
     """ Updates an agent after interaction with the environment.
+
+    Args:
+      reward (list of float): contains individual node rewards
+      next_state (list of int): contains individual node loads
+      learn (bool): indicates whether the Q-table will be updated
     """
     if learn:
-      self.update_policy(next_state)
-      self.update_Qvalue(reward=reward, next_state=next_state)
-      self.alpha *= self.decay
+      self.update_qvalue(reward=reward, next_state=next_state)
+      self.update_policy()
 
     self.current_state = next_state
-
 
 
   def compute_target(self, next_state):
     """ Computes the value of the target policy in the temporal difference
     learning update.
-     """
-    # entry = [slice(None)] * len(self.state_space)
-    # entry[:len(next_state)] = next_state
-    #
-    # Qnext = self.Qtable[tuple(entry)]
-    # return np.max(Qnext)
+
+    Args:
+      next_state (list of int): contains individual node loads
+    """
 
     return self.V[tuple(next_state)]
 
-  def update_policy(self, next_state, retry=False):
+  def update_policy(self, retry=False):
     """ Update the policy and corresponding value function of agent.
 
-    The update requires the solution of a linear program.
+    The update requires the solution of a linear program
+
+    Args:
+      next_state (list of int): contains individual node loads
+      retry (bool): indicates if we'll try to solve the LP for a second time.
     """
 
-    minV = np.max(self.Qtable)
-    min_policy = []
-    
-    # get Qvalues for current state
+    # get q-values for current state
     current_entry = [slice(None)] * len(self.state_space)
-    for idx, el in enumerate(next_state):
+    for idx, el in enumerate(self.current_state):
       current_entry[idx] = el
-    Qtable = self.Qtable[tuple(current_entry)]
+    qtable_state = self.Qtable[tuple(current_entry)]
 
+    minV = np.max(self.Qtable)
+    min_policy = np.array([])
+    min_def = 1
+
+    # restrict candidate adversaries if selection is random
     if self.explore_attack:
       x = random.uniform(0, 1)
-      if (x < self.explore_attack):
-        random_adv = random.randint(0,len(self.nodes)-1)
-        candidate_advs = [self.nodes[random_adv]]
+      if x < self.explore_attack:
+        random_adv = np.random.choice(range(len(self.nodes)),
+                                      self.attack_size, replace=False)
+        candidate_advs = [self.nodes[idx] for idx in random_adv]
       else:
         candidate_advs = self.nodes
     else:
       candidate_advs = self.nodes
 
-    count = 0
-
-    for node_idx, node in enumerate(candidate_advs):
+    # ----- search for worst-case adversarial selection of nodes-----
+    for node_idx, adv_node in enumerate(candidate_advs):
 
       # assume that the current node is the adversary
-      adv_idxs = [node.idx]
+      adv_idxs = [adv_node.idx]
 
       # remaining nodes are defenders
       def_idx = [node.idx for node in self.nodes if (node.idx) not in adv_idxs]
       def_idx = def_idx[0] # only works for two nodes
 
+      num_a = (len(self.nodes) - len(adv_idxs)) * 4
+      num_o = len(adv_idxs) * 4
 
-      # opponents' actions need to be in the first dimension
+      # ----- swap axes in Q-table so that adversaries are first -----
+      map = {}
+      count = 0
+      opp_nodes = [adv_node]
+      for opp in opp_nodes:
+        pos = self.nodes.index(opp)
+        map[count] = pos
+        map[count + 1] = pos + 1
+        count += 1
+      # for defend in [node for node in self.nodes if node not in opp_nodes]:
+      #   pos = self.nodes.index(defend)
+      #   map[count] = pos
+      #   count += 1
 
+      for key, value in map.items():
+        qtable = np.swapaxes(qtable_state, key, value)
 
+      qtable = np.reshape(qtable, (num_o, num_a))
 
-      current_pi = self.policies[def_idx-1][tuple(current_entry)]
-      num_a = (len(self.nodes) - len(adv_idxs))*4
-      num_o = len(adv_idxs)*4
-      Qtable_res = np.reshape(Qtable, (num_o, num_a))
-      if 2 in adv_idxs:
-        Qtable_minimax = Qtable_res.T
-      else:
-        Qtable_minimax = Qtable_res
+      # solve linear program
+      res = solve_LP(num_a, num_o, qtable)
 
-      res = solve_LP(num_a, num_o, Qtable_minimax)
-      #res = lp_solve(Qtable_minimax, num_a, num_o)
-      success = res.success
-
-      if success:
+      if res.success:
+        current_pi = self.policies[def_idx - 1][tuple(current_entry)]
         lp_policy = np.reshape(res.x[1:], current_pi.shape)
-
         V = res.x[0]
 
+        # keep adversarial selection with minimum value
         if V <= minV:
           minV = V
           min_policy = lp_policy
           min_def = def_idx
-          count+=1
 
       elif not retry:
-
         return self.update_policy(retry=True)
+
       else:
         print("Alert : %s" % res.message)
 
+        # if optimisation fails twice, keep the previous policy
+        min_policy = self.policies[min_def-1][tuple(current_entry)]
+
     self.V[tuple(current_entry)] = minV
+
+    if min_policy.shape == (0,):
+      print("pause")
+
     self.policies[min_def-1][tuple(current_entry)] = min_policy
 
-    if min_def ==1:
-      self.selection_first +=1
-      self.selections_first.append(self.selection_first)
-      self.selections_second.append(self.selection_second)
+    #self.log["defenders"].append(min_def-1)
 
-    elif min_def ==2:
-      self.selection_second +=1
-      self.selections_second.append(self.selection_second)
-      self.selections_first.append(self.selection_first)
+  def onpolicy_action(self, deployment):
+    """ Performs the on-policy action.
 
-    if count ==2:
-      self.ties+=1
-
-
-    #print(min_def, self.selection_first)
-
-  def greedy_action(self, just_test=False):
-    """ Performs  the greedy action according to a probabilistic policy
+    During training, actions are selected based on the probabilistic policy.
+    During deployment, actions are again selected probabilistically or the
+    greedy action is selected (depending on self.determ_execution).
     """
-    # get current state
+    # get q-values for current state
     current_entry = [slice(None)] * len(self.state_space)
     for idx, el in enumerate(self.current_state):
       current_entry[idx] = el
-    
-    self.current_action = []
-    for idx, node in enumerate(self.nodes):
-      
-      # get node's policy
-      policy = self.policies[idx]
-      
-      # get node's policy for current state
-      current_policy = policy[tuple(current_entry)]
-      
-      # randomly sample policy
-      rand = np.random.rand()
-  
-      flat_pi = np.ndarray.flatten(current_policy)
-      cumSumProb = np.cumsum(flat_pi)
-  
-      action = 0
-      while rand > cumSumProb[action]:
-        action+=1
+    qcurrent = self.Qtable[tuple(current_entry)]
 
-      #just_test = False
+    if self.determ_execution and deployment:
+      # ----- execute deterministic policy during deployment -----
+      max_actions_flat = np.argmax(qcurrent)
 
-      if just_test:
-        current_entry = [slice(None)] * len(self.state_space)
-        for idx, el in enumerate(self.current_state):
-          current_entry[idx] = el
-        Qcurrent = self.Qtable[tuple(current_entry)]
+      current_action = list(np.unravel_index(max_actions_flat,
+                                             qcurrent.shape))
 
-        # find greedy action
-        max_actions_flat = np.argmax(Qcurrent)
+      self.current_action = current_action
 
-        current_action = list(np.unravel_index(max_actions_flat,
-                                               Qcurrent.shape))
+    else:
+      # ----- execute probabilistc policy during training and deployment -----
 
-        self.current_action = current_action
+      self.current_action = []
+      for idx, node in enumerate(self.nodes):
 
-      else:
+        # get node's policy
+        policy = self.policies[idx]
 
-        self.current_action = list(np.unravel_index(action, policy.shape))
+        # get node's policy for current state
+        current_policy = policy[tuple(current_entry)]
+
+        # randomly sample policy
+        rand = np.random.rand()
+
+        flat_pi = np.ndarray.flatten(current_policy)
+        cumSumProb = np.cumsum(flat_pi)
+
+        action = 0
+        while rand > cumSumProb[action]:
+          action+=1
+
+        self.current_action.extend(list(np.unravel_index(action,
+                                                         current_policy.shape)))
 
     return self.current_action
 

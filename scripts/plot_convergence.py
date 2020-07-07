@@ -1,327 +1,168 @@
-""" This script can be used to compare the performance of different learning
-algorithms
+""" This script can be used to compare the convergence rate of different
+methods.
 
+Plots for the duration of episodes and mean rewards are produced.
 
+Output: 1) evolution of episode duration without attacks during evaluation (one
+plot for all methods)
+2) evolution of mean sample reward without attacks during evaluation (one plot
+for all methods)
+3) evolution of mean sample reward for different probabilities of attack
+during evalution (one plot for each method)
 """
+
+# ----- generic imports -----
 import pickle
 import matplotlib.pyplot as plt
-from matplotlib.ticker import FormatStrFormatter
-import matplotlib
 import numpy as np
 import seaborn
 import sys
-from pathlib import Path
 import pandas as pd
-
 import os
+
+# ----- project-specific imports ------
 sys.path.insert(0,"../source")
 from q_agent import *
 
+# parse input
+top_dir = sys.argv[1]
+attack_type = sys.argv[2]
 
 # ----- set up -----
-
-projects = ["Qlearning2", "minimaxQ", "RomQ"]
+project = "../projects/" + top_dir
 methods = ["Qlearning", "minimaxQ", "RomQ"]
 seaborn.set()
-directories = ["../projects/samples_final/" + method for method in projects]
-trials = 7
-max_delta = 1
-delta_values = [0]
-delta_values.extend(np.arange(start=0.1, stop=max_delta + 0.01, step=0.1))
+directories = [project + "/" + method for method in methods]
 
-# for trial in range(trials):
-#
-#   for idx, directory in enumerate(directories):
-#
-#     method_samples= []
-#     method_rewards = []
-#     method_duration = []
-#
-#     config = pickle.load(open(directory + "/config.pkl", "rb"))
-#
-#     interm_episodes = config.interm_episodes[trial]
-#     final_episode = config.episodes
-#     trial_dir = directory + "/trial_" + str(trial)
-#
-#
-#     method = methods[idx]
-#
-#     # ----- load performance data -----
-#     results = []
-#     samples = []
-#     episodes_duration = []
-#     delta = delta_values[0]
-#     results.append([])
-#     samples.append([])
-#     episodes_duration.append([])
-#
-#     for episode in interm_episodes:
-#       episode = int(episode)
-#
-#       episode_dir = trial_dir + "/episode_" + str(episode) + "/adversary_" \
-#                     + methods[idx] + "_attack_worst"
-#
-#       # load train data
-#       train_file = trial_dir + "/episode_" + str(episode) + "/agents.pkl"
-#       train_data = pickle.load(open(train_file, "rb"))
-#       episode_samples = train_data["episode_samples"]
-#
-#       # episode_samples += episode
-#       # load test data
-#       current_file = episode_dir + "/data/test_data_" + str(delta) + ".pkl"
-#       data = pickle.load(open(current_file, "rb"))
-#       rewards = data["performance_test"]["episode_rewards"]
-#       duration = data["performance_test"]["episodes_duration"]
-#
-#       mean_reward = np.mean(rewards)
-#       method_rewards.append(mean_reward)
-#       method_duration.append(np.mean(duration))
-#       method_samples.append(episode_samples)
-#
-#     plt.plot(method_samples, method_rewards, label=methods[idx])
-#
-#   plt.ylabel("Average episode reward, $r$")
-#   plt.xlabel("Sample")
-#   plt.legend(loc="lower center", prop={'size': 10}, ncol=3)
-#   plt.savefig("../plots/trial_" + str(trial) +"rewards_conv.png")
-#   plt.clf()
-#
-#
-# for trial in range(trials):
-#
-#   for idx, directory in enumerate(directories):
-#
-#     method_samples= []
-#     method_rewards = []
-#     method_duration = []
-#
-#     config = pickle.load(open(directory + "/config.pkl", "rb"))
-#     interm_episodes = config.interm_episodes[trial]
-#
-#     final_episode = config.episodes
-#     trial_dir = directory + "/trial_" + str(trial)
-#
-#     delta_values = config.delta_values
-#     delta_values = delta_values[::2]
-#
-#     method = methods[idx]
-#
-#     # ----- load performance data -----
-#     results = []
-#     samples = []
-#     episodes_duration = []
-#     delta = delta_values[0]
-#     results.append([])
-#     samples.append([])
-#     episodes_duration.append([])
-#
-#     for episode in interm_episodes:
-#       episode = int(episode)
-#
-#       episode_dir = trial_dir + "/episode_" + str(episode) + "/adversary_" \
-#                     + methods[idx] + "_attack_worst"
-#
-#       # load train data
-#       train_file = trial_dir + "/episode_" + str(episode) + "/agents.pkl"
-#       train_data = pickle.load(open(train_file, "rb"))
-#       episode_samples = train_data["episode_samples"]
-#
-#       # episode_samples += episode
-#       # load test data
-#       current_file = episode_dir + "/data/test_data_" + str(delta) + ".pkl"
-#       data = pickle.load(open(current_file, "rb"))
-#       rewards = data["performance_test"]["episode_rewards"]
-#       duration = data["performance_test"]["episodes_duration"]
-#
-#       mean_reward = np.mean(rewards)
-#       method_rewards.append(mean_reward)
-#       method_duration.append(np.mean(duration))
-#       method_samples.append(episode_samples)
-#
-#     plt.plot(method_samples, method_duration, label=methods[idx])
-#
-#   plt.ylabel("Average episode reward, $r$")
-#   plt.xlabel("Sample")
-#   plt.legend(loc="lower center", prop={'size': 10}, ncol=3)
-#   plt.savefig("../plots/trial_" + str(trial) +"episode_conv.png")
-#   plt.clf()
 
-# ----- plots averaged over trials -----
-bins = list(range(0,200000, 5000))
-# print(bins)
-# for idx, directory in enumerate(directories):
-#
-#   rewards_dict = {"sample":[], "reward": []}
-#   duration_dict = {"sample": [], "duration": []}
-#   method = methods[idx]
-#   for trial in range(trials):
-#     print("trial", trial)
-#
-#
-#     if method == "RomQ":
-#       temp_episodes = [82000, 84000, 84000, 84000, 84000, 84000, 84000,
-#                    84000]
-#       interm_episodes = []
-#       for trial_idx, final_episode in enumerate(temp_episodes):
-#
-#         trial_episodes = np.arange(0, final_episode+1, 2000)
-#         interm_episodes.append(trial_episodes)
-#     elif method == "minimaxQ":
-#       temp_episodes = [10000, 10000, 10000, 10000, 10000, 10000, 10000]
-#       interm_episodes = []
-#       for trial_idx, final_episode in enumerate(temp_episodes):
-#         trial_episodes = np.arange(0, final_episode + 1, 2000)
-#         interm_episodes.append(trial_episodes)
-#     else:
-#       config = pickle.load(open(directory + "/config.pkl", "rb"))
-#       interm_episodes = config.interm_episodes
-#     #final_episode = interm_episodes[-1]
-#     trial_dir = directory + "/trial_" + str(trial)
-#
-#     delta_values = config.delta_values
-#     delta_values = delta_values[::2]
-#
-#     method = methods[idx]
-#
-#     # ----- load performance data -----
-#     results = []
-#     samples = []
-#     episodes_duration = []
-#     delta = delta_values[0]
-#     results.append([])
-#     samples.append([])
-#     episodes_duration.append([])
-#     previous_len = 0
-#
-#     for episode in interm_episodes[trial]:
-#       episode = int(episode)
-#
-#       episode_dir = trial_dir + "/episode_" + str(episode) + "/adversary_" \
-#                     + methods[idx] + "_attack_worst"
-#
-#       # load train data
-#       train_file = trial_dir + "/episode_" + str(episode) + "/agents.pkl"
-#       train_data = pickle.load(open(train_file, "rb"))
-#       episode_samples = train_data["episode_samples"]
-#
-#       # episode_samples += episode
-#       # load test data
-#       current_file = episode_dir + "/data/test_data_" + str(delta) + ".pkl"
-#       data = pickle.load(open(current_file, "rb"))
-#       rewards = data["performance_test"]["episode_rewards"]
-#       duration = data["performance_test"]["episodes_duration"]
-#
-#       mean_reward = np.mean(rewards)
-#
-#       if episode_samples < 200000:
-#         rewards_dict["reward"].extend([np.mean(rewards)])
-#         for bin in bins:
-#           if np.mean(episode_samples) > bin:
-#             mean_episode_samples = bin
-#         rewards_dict["sample"].extend([mean_episode_samples])
-#
-#     # df_temp = pd.DataFrame(data=rewards_dict)
-#     # seaborn.lineplot(x="sample", y="reward", data=df_temp, label=method)
-#     # plt.xlabel("Sample")
-#     # plt.ylabel("Average episode reward, $r$")
-#     # plt.legend()
-#     # plt.savefig(      "../plots/comp_rewards_trial_" + str(trial) + "_ethod_" + method + ".png")
-#     # plt.clf()
-#
-#   df = pd.DataFrame(data=rewards_dict)
-#   seaborn.lineplot(x="sample", y="reward", data=df, label=method, ci=95,
-#                    err_style="band")
-#
-#   # print(bins)
-#   # #pd.np.digitize(df.sample, bins=bins)
-#   # df['sample'] = pd.qcut(df['sample'], 1000, duplicates='drop')
-#   #df = df.loc[(df['sample'].isin(range(1, 300000, 100)))]
-#
-#
-# plt.xlabel("Sample")
-# plt.ylabel("Average episode reward, $r$")
-# plt.legend()
-# plt.savefig("../plots/comp_rewards.png")
-# plt.clf()
-
+# ----- plot convergence of duration without attacks for all methods -----
+delta = 0
 for idx, directory in enumerate(directories):
+
+  config = pickle.load(open(directory + "/config.pkl", "rb"))
+  trials = list(range(config.trials))
+  rewards_dict = {"sample": [], "reward": []}
+  duration_dict = {"sample": [], "duration": []}
+  method = methods[idx]
+
+  for trial in trials:
+
+    interm_epochs = config.interm_epochs[trial]
+
+    trial_dir = directory + "/trial_" + str(trial)
+    epoch_samples = 0
+    for epoch in interm_epochs:
+
+      epoch_dir = trial_dir + "/epoch_" + str(epoch) + "/adversary_" \
+                    + methods[idx] + "_attack_" + attack_type
+
+      # load test data
+      current_file = epoch_dir + "/data/test_data_" + str(delta) + ".pkl"
+      data = pickle.load(open(current_file, "rb"))
+      duration = data["performance"]["durations"]
+      duration_dict["duration"].append(np.mean(duration))
+      duration_dict["sample"].append(epoch_samples)
+      epoch_samples += int(config.train_samples/len(interm_epochs))
+
+
+  dataframe = pd.DataFrame(data=duration_dict)
+  seaborn.lineplot(x="sample", y="duration", data=dataframe, ci=100,
+                   err_style="band", label=method)
+
+plt.xlabel("Sample")
+plt.ylabel("Average time to reset, $T_{reset}$")
+plt.legend()
+plt.title("$\delta=0$")
+plt.savefig("../plots/methods_duration.png")
+plt.clf()
+
+# ----- plot convergence of rewards without attacks for all methods -----
+delta = 0
+for idx, directory in enumerate(directories):
+
+  config = pickle.load(open(directory + "/config.pkl", "rb"))
+  trials = list(range(config.trials))
 
   rewards_dict = {"sample": [], "reward": []}
   duration_dict = {"sample": [], "duration": []}
   method = methods[idx]
 
-  for trial in range(trials):
-    print("trial", trial)
+  for trial in trials:
 
-    #config = pickle.load(open(directory + "/config.pkl", "rb"))
-    if method == "RomQ":
-      temp_episodes = [82000, 84000, 84000, 84000, 84000, 84000, 84000,
-                       84000]
-      interm_episodes = []
-      for trial_idx, final_episode in enumerate(temp_episodes):
-        trial_episodes = np.arange(0, final_episode + 1, 2000)
-        interm_episodes.append(trial_episodes)
-    elif method == "minimaxQ":
-      temp_episodes = [10000, 10000, 10000, 10000, 10000, 10000, 10000]
-      interm_episodes = []
-      for trial_idx, final_episode in enumerate(temp_episodes):
-        trial_episodes = np.arange(0, final_episode + 1, 2000)
-        interm_episodes.append(trial_episodes)
-    else:
-      config = pickle.load(open(directory + "/config.pkl", "rb"))
-      interm_episodes = config.interm_episodes
-
-
-    #final_episode = interm_episodes[-1]
+    interm_epochs = config.interm_epochs[trial]
     trial_dir = directory + "/trial_" + str(trial)
+    epoch_samples = 0
+    for epoch in interm_epochs:
 
-    delta_values = config.delta_values
-    delta_values = delta_values[::2]
+      epoch_dir = trial_dir + "/epoch_" + str(epoch) + "/adversary_" \
+                    + methods[idx] + "_attack_" + attack_type
 
-    method = methods[idx]
-
-    # ----- load performance data -----
-    results = []
-    samples = []
-    episodes_duration = []
-    delta = delta_values[0]
-    results.append([])
-    samples.append([])
-    episodes_duration.append([])
-
-    for episode in interm_episodes[trial]:
-      episode = int(episode)
-
-      episode_dir = trial_dir + "/episode_" + str(episode) + "/adversary_" \
-                    + methods[idx] + "_attack_worst"
-
-      # load train data
-      train_file = trial_dir + "/episode_" + str(episode) + "/agents.pkl"
-      train_data = pickle.load(open(train_file, "rb"))
-      episode_samples = train_data["episode_samples"]
-
-      # episode_samples += episode
       # load test data
-      current_file = episode_dir + "/data/test_data_" + str(delta) + ".pkl"
+      current_file = epoch_dir + "/data/test_data_" + str(delta) + ".pkl"
       data = pickle.load(open(current_file, "rb"))
-      rewards = data["performance_test"]["episode_rewards"]
-      duration = data["performance_test"]["episodes_duration"]
+      rewards = data["performance"]["rewards"]
+      rewards_dict["reward"].append(np.mean(rewards))
+      rewards_dict["sample"].append(epoch_samples)
+      epoch_samples += int(config.train_samples/len(interm_epochs))
 
-      if episode_samples < 200000:
 
-        duration_dict["duration"].extend([np.mean(duration)])
-        for bin in bins:
-          if np.mean(episode_samples) > bin:
-            mean_episode_samples = bin
-        duration_dict["sample"].extend([mean_episode_samples])
-
-  dataframe = pd.DataFrame(data=duration_dict)
-  seaborn.lineplot(x="sample", y="duration", data=dataframe, ci=95,
+  dataframe = pd.DataFrame(data=rewards_dict)
+  seaborn.lineplot(x="sample", y="reward", data=dataframe, ci=100,
                    err_style="band", label=method)
 
-
 plt.xlabel("Sample")
-plt.ylabel("Average episode reward, $r$")
-plt.legend()
-plt.savefig("../plots/comp_dur.png")
+plt.ylabel("Average sample reward, $r$")
+plt.title("$\delta=0$")
+plt.legend(loc="lower right")
+plt.savefig("../plots/methods_rewards.png")
 plt.clf()
+
+
+# ----- plot convergence of rewards for each method for different
+# probabilities of attack  -----
+for idx, directory in enumerate(directories):
+
+  config = pickle.load(open(directory + "/config.pkl", "rb"))
+  trials = list(range(config.trials))
+
+  rewards_dict = {"sample": [], "reward": []}
+  duration_dict = {"sample": [], "duration": []}
+  method = methods[idx]
+  delta_values = config.delta_values
+
+  for delta in delta_values[::2]:
+
+    for trial in trials:
+      interm_epochs = config.interm_epochs[trial]
+      trial_dir = directory + "/trial_" + str(trial)
+
+      epoch_samples = 0
+      for epoch in interm_epochs:
+
+        epoch_dir = trial_dir + "/epoch_" + str(epoch) + "/adversary_" \
+                      + methods[idx] + "_attack_" + attack_type
+
+
+        # load test data
+        current_file = epoch_dir + "/data/test_data_" + str(delta) + ".pkl"
+        data = pickle.load(open(current_file, "rb"))
+        rewards = data["performance"]["rewards"]
+        sum_negative = np.sum([el for el in rewards if el<0])
+        sum_positive = np.sum([el for el in rewards if el>0])
+
+        rewards_dict["reward"].append(np.mean(rewards))
+        rewards_dict["sample"].append(epoch_samples)
+
+        epoch_samples += int(config.train_samples/len(interm_epochs))
+
+
+    dataframe = pd.DataFrame(data=rewards_dict)
+    seaborn.lineplot(x="sample", y="reward", data=dataframe, ci=100,
+                     err_style="band", label="$\delta=$" + str(delta))
+
+  plt.xlabel("Sample")
+  plt.ylabel("Average episode reward, $r$")
+  plt.title("$\delta=0$")
+  plt.legend(loc="lower center", prop={'size': 8}, ncol=3)
+  plt.savefig(directory + "/plots/rewards_attacks.png")
+  plt.clf()

@@ -1,55 +1,48 @@
 """ Contains the implementation of a Q-learning agent."""
 
+# ----- generic imports -----
 import numpy as np
-import random
-import math
-import itertools
 
+# ----- project-specific imports -----
 from agent import *
 
 class QAgent(Agent):
   """ An agent that uses classical Q-learning.
+
+  Attributes:
+    control_nodes (list of Node): the nodes whose actions are controlled
   """
 
-
-  def __init__(self, nodes, adjust_parameters, epsilon=0, alpha=0.1, gamma=0.9,
-               temperature=0.01):
+  def __init__(self, nodes, epsilon, alpha, gamma):
     """ Initializes a Qlearning agent.
-
-    N nodes are assigned to the agent for control.
-
-    Args:
-      nodes (list of :obj:`Node`): a list of nodes that the agent is
-      controlling
-      epsilon (float): exploration rate
-      alpha (float): learning rate
-      gamma (float): discount factor
-      temperature (float): temperature used for Boltzmann exploration
-      adjust_parameters (bool): indicates whether the learning and
-      exploration rate will be decreased at each iteration
     """
 
-    super().__init__(nodes=nodes, epsilon=epsilon, alpha=alpha, gamma=gamma,
-                     temperature=temperature)
-    self.adjust_parameters = adjust_parameters
+    super().__init__(nodes=nodes, epsilon=epsilon, alpha=alpha, gamma=gamma)
+
     self.control_nodes = self.nodes
 
-    # none of the nodes is an adversary
-    self.defenders =  [node.idx for node in self.nodes]
+    # initialize policy
+    self.policies = []
+    for node in self.control_nodes:
+      neighbors = node.neighbors
+      policy_action_space = [2, len(neighbors)]
+      policy_space = self.state_space + tuple(policy_action_space)
+      self.policies.append(np.ones(shape=policy_space) / np.sum(
+        policy_action_space))
 
-  def update(self, reward, next_state, learn=True):
+
+  def update(self, reward, next_state, learn=True, opponent_action=[]):
     """ Updates an agent after interaction with the environment.
 
-    During learning both the Q-table and the state are updating. Durinng
-    testing only the state is updated
+    Args:
+      reward (list of float): contains individual node rewards
+      next_state (list of int): contains individual node loads
+      learn (bool): indicates whether the Q-table will be updated
     """
     if learn:
-      self.update_Qvalue(reward=reward, next_state=next_state)
-      if self.adjust_parameters:
-        self.alpha = self.alpha * 0.8
-        self.epsilon = self.epsilon * 0.8
-    self.current_state = next_state
+      self.update_qvalue(reward=reward, next_state=next_state)
 
+    self.current_state = next_state
 
   def compute_target(self, next_state):
     """ Computes the value of the target policy in the temporal difference
@@ -58,41 +51,42 @@ class QAgent(Agent):
     For Q-learning, this is defined as max_a Q(s,a).
 
     Args:
-      next_state (list): one-dimensional, contains the state of each node
-      assigned to the agent
-     """
-    # isolate Qtable for current state
+      next_state (list): contains the state of each node in the MAS
+      
+    Returns: the float value of the target policy
+    """
+    # get Qvalues for current state
     entry = [slice(None)] * len(self.state_space)
     entry[:len(next_state)] = next_state
+    qnext = self.Qtable[tuple(entry)]
 
-    Qnext = self.Qtable[tuple(entry)]
-    return np.max(Qnext)
+    # pick Q-value of greedy action
+    return np.max(qnext)
 
-
-
-  def greedy_action(self, just_test=False):
+  def onpolicy_action(self, evaluation=False):
     """ Finds the greedy action based on the deterministic policy.
     """
-
-    # isolate Qtable for current state
+    # get q-values for current state
     current_entry = [slice(None)] * len(self.state_space)
     for idx, el in enumerate(self.current_state):
       current_entry[idx] = el
-    Qcurrent = self.Qtable[tuple(current_entry)]
+    qcurrent = self.Qtable[tuple(current_entry)]
 
     # find greedy action
-    max_actions_flat = np.argmax(Qcurrent)
-    self.current_action = list(np.unravel_index(max_actions_flat,
-                                               Qcurrent.shape))
+    max_actions_flat = np.argmax(qcurrent)
+    all_indices = list(zip(*np.where(qcurrent == np.max(qcurrent))))
+    random_ind = random.randint(0,len(all_indices)-1)
+    indices = all_indices[random_ind]
+    self.current_action = list(indices)
 
-    # compute deterministic policies for each action column
-    self.policies = []
-    for node in self.control_nodes:
-      node_action_space = [2]
-      node_action_space.extend([len(node.neighbors)])
-      self.policies.append(np.zeros(tuple(node_action_space)))
+    # ----- compute deterministic policies for each control node -----
+    # set all entries to zero
+    for idx, policy in enumerate(self.policies):
+      policy[tuple(current_entry)] = np.zeros(policy[tuple(
+        current_entry)].shape)
+      self.policies[idx] = policy
 
+    # set entries for greedy action to 1
     for idx, action in enumerate(self.current_action[::2]):
-      node_idx = idx
-      self.policies[node_idx][action] = 1
-      self.policies[node_idx][self.current_action[idx+1]] = 1
+      comb_action = (action, self.current_action[idx*2+1])
+      self.policies[idx][tuple(current_entry)][comb_action] = 1

@@ -1,241 +1,175 @@
 """ Contains the implementation of a generic temporal difference learning
 agent."""
 
+# ----- generic imports -----
 import numpy as np
 import random
 import itertools
 import copy
 
-class Agent():
+
+class Agent:
   """ A base class for temporal difference learning agents.
 
-  Note: Do not create objects of this class.
+  An agent always has observability of all nodes of the MAS, as the Q-table
+  and policies are learned on the joint state and action space. Depending on
+  its type, an agent may have control over the actions of a subset of the
+  nodes, so other agents need to communicate their actions. This is useful
+  for centralized and joint learners. Independent learners should override
+  the __init__ function and define the state-action space accordingly.
 
-  The state and action space of an agent contains information only about the
-  nodes assigned to that agent. Thus, using this class, we can implement
-  a centralized learner or independent learners or coordinated learners,
-  where each learner find a policy over its own state-action space. If we
-  have joint Q-learners, the Qvalue function remains the same, but the policy of learners
-  is defined only over their own action space (not the joint one).
+  Note: Do not create objects of this class, it is only an interface.
+
+  Attributes:
+    state_space (tuple of int): the dimensions of the state space. each node
+    of the MAS is another dimension
+    action_space (tuple of int): the dimensions of the action space. each node
+    controlled by the agent contributes two dimensions (execute and off-load)
+    learn_space (tuple of int): the dimensions of the Q-table
+    Qtable (array of float): an array of dimension learn_space
+    nodes (list of Node): all nodes of the MAS
+    current_state (list of int): of dimension state_space
+    current_action (list of int): the action the agent intends to execute in
+    the next step
+    learn_parameters (dict of str: float): contains the values of different
+     hyperparameters including learning rate, discount factor, exploration rate
+    log (dict of values): used for logging information for debugging and
+     plotting
   """
 
-  def __init__(self, nodes, epsilon, alpha, gamma, temperature,
-               explore="egreedy"):
+  def __init__(self, nodes, epsilon, alpha, gamma):
     """ Initializes a generic agent.
 
     Args:
-      nodes (list of :obj:`Node`): a list of nodes that the agent is
-      controlling
+      nodes (list of :obj:`Node`): nodes comprising the MAS
       epsilon (float): exploration rate
       alpha (float): learning rate
       gamma (float): discount factor
-      temperature (float): temperature used for Boltzmann exploration
     """
 
     # ----- initialize Qtable -----
+    self.nodes = nodes
+
     # define state space
-    self.state_space = []
+    state_space = []
     for node in nodes:
       state_range = node.capacity + 2
-      self.state_space.append(state_range) # [0,capacity]
+      state_space.append(state_range)  # [0,capacity]
+    self.state_space = tuple(state_space)
 
     # define action space
-    self.action_space = []
+    action_space = []
     for node in nodes:
-      self.action_space.append(2) # serve action
-      self.action_space.append(len(node.neighbors)) # send action
+      action_space.append(2)  # execute action
+      action_space.append(len(node.neighbors))  # off-load actions
+    self.action_space = tuple(action_space)
 
     self.learn_space = self.state_space + self.action_space
-    self.Qtable = np.random.uniform(low=0, high=0.001, size=tuple(
-      self.learn_space))
-
-    # set entries of terminal states to 0
-    self.updates = []
-
+    self.Qtable = np.random.uniform(low=0, high=0.001, size=self.learn_space)
 
     # initialize current state and action
-    self.nodes = nodes
-    self.current_state = [0] * len(nodes) # no load
-    self.current_action = [0,0] * len(nodes)
+    self.current_state = [0] * len(nodes)  # initial state
+    self.current_action = [0, 0] * len(nodes)
+
+
 
     # initialize learning parameters
-    self.epsilon = epsilon
-    self.alpha = alpha
-    self.gamma = gamma
-    self.temperature = temperature
-    self.explore = explore
+    self.learn_parameters = {"epsilon": epsilon, "alpha": alpha, "gamma": gamma}
+
+    # initialize dictionary for logging
+    self.log = {"updates": []}
 
 
 
-  def find_adversarial_actions(self, K):
-    """ Finds adversarial actions for current policy.
-
-    An adversarial attack consists in attackers choosing the K nodes to
-    attack so that the Q-table of the minimax game played by adversaries and
-    players has the minimum value.
-
-    Args:
-      K (int): number of attackers
-
-    Returns:
-      the indexes of adversaries and an adversarial action that is a
-      dictionary with entries (adv_index): adv_action
-    """
-    # get Qtable at current state
-    current_entry = [slice(None)] * len(self.state_space)
-    for idx, el in enumerate(self.current_state):
-      current_entry[idx] = el
-    Qcurrent = self.Qtable[tuple(current_entry)]
-
-    # find greedy actions
-    max_actions_flat = np.argmax(Qcurrent)
-    max_actions = np.unravel_index(max_actions_flat, Qcurrent.shape)
-
-    # find all possible subsets of K attackers in N nodes
-    indexes = list(range(len(self.nodes)))
-    attackers_partitions = list(itertools.combinations(indexes, K))
-
-
-    # ----- find partition with minimum Q-value -----
-
-    # initialize search variables
-    Qadv = np.max(Qcurrent)
-    actions = max_actions
-    worst_partition = attackers_partitions[0]
-    for partition in attackers_partitions:
-
-      # find subset of defenders
-      defenders = [node for node in indexes if node not in partition]
-
-      # find subset of Qtable when defenders are maximizing
-      indcs = [slice(None)] * len(max_actions)
-      for defend in defenders:
-        defend_ind = defend*2 # cause each node has two actions
-        indcs[defend_ind] = max_actions[defend_ind]
-        indcs[defend_ind+1] = max_actions[defend_ind+1]
-      defend_Qvalues = Qcurrent[tuple(indcs)]
-
-      # minimize remaining actions over attackers
-      min_actions = np.argmin(defend_Qvalues)
-      min_actions = np.unravel_index(min_actions, defend_Qvalues.shape)
-
-      # consolidate in single list
-      partition_actions = list(max_actions)
-      counter = 0
-      for idx, action in enumerate(partition_actions):
-        if idx in partition:
-          partition_actions[idx] = min_actions[counter]
-          counter += 1
-
-      # keep partition with minimum Qvalue
-      Qvalue = Qcurrent[tuple(partition_actions)]
-      if Qvalue < Qadv:
-        Qadv = Qvalue
-        actions = partition_actions
-        worst_partition = partition
-
-    # get (absolute) indexes of adversaries and their actions
-    adv_actions = {}
-    for idx in worst_partition:
-      trans_idx = idx*2
-      absolute_idx = self.nodes[idx].idx
-      serve_action = actions[trans_idx]
-      send_action = actions[trans_idx + 1]
-      adv_actions[absolute_idx] = [serve_action, send_action]
-    return adv_actions
-
-  def execute_policy(self, attack_actions, exploration=True):
+  def execute_policy(self, attack_actions, evaluation=False):
     """ Choose the action to perform based on the policy, the exploration
     scheme and the presence of attackers.
 
     This function is used both during training, when no adversaries can be
-    preset, and testing, when no exploration should take place.
+    present, and evluation, when no exploration should take place.
 
     Note: the policy is defined over the action space of defenders. Except
     for minimaxQ, where some nodes are defenders and some opponents,
-    all nodes are defenders. Do not confuse attackers with minimaxQ opponents.
+    all nodes are defenders. Do not confuse adversaries (during evaluation)
+    with minimaxQ opponents (during training).
 
     Args:
-       attack_actions (list of int): one-dimensional list of N*2
-       exploration (bool): indicates whether exploration should take place
-    ."""
-    # ----- e-greedy -----
-    if self.explore == "egreedy":
+       attack_actions (dict of int: int): has the from abs_idx: relative actions
+       deployment (bool): indicates whether the policy is currently being
+       deployed, in which case no exploration takes place
 
-      x = random.uniform(0, 1)
-      if ((x < self.epsilon) and exploration): # random move
-        self.current_action = []
-        for idx, node in enumerate(self.nodes):
-          if (node.idx) in self.defenders:
-            self.current_action.append(random.randint(0,1))
-            self.current_action.append(random.randint(0,
-            len(node.neighbors)-1))
-            #self.current_action.append(0)
-            #self.current_action.append(0)
+    Returns:
+      a list of actions to execute, where indexes are absolute
+    """
+    # ----- execute e-greedy policy -----
 
-      else: # greedy move
-        self.greedy_action(just_test=(not exploration))
+    x = random.uniform(0, 1)
+    if ((x < self.learn_parameters["epsilon"]) and not(evaluation)):
 
-    # ----- implement attack -----
-    # find if attacked nodes are controlled by this agent and map absolute
-    # indexes to action indexes
-    # attacked_nodes = []
-    # nodes_idxs = [node.idx for node in self.nodes]
-    # keep_nodes = []
-    # for key, value in attack_actions.items():
-    #   for pos, node_idx in enumerate(nodes_idxs):
-    #     if key == node_idx:
-    #       keep_nodes.append(pos)
-    #       attacked_nodes.append(key)
-    #
-    # for pos, node in enumerate(attacked_nodes):
-    #   value = attack_actions[node]
-    #   self.current_action[keep_nodes[pos]] = value[0]
-    #   self.current_action[keep_nodes[pos] + 1] = value[1]
+      # perform random move
+      self.current_action = []
+      for idx, node in enumerate(self.nodes):
+        if node in self.control_nodes:
+          self.current_action.append(random.randint(0, 1))  # execute action
+          self.current_action.append(
+            random.randint(0, len(node.neighbors) - 1))
 
-    if len(self.current_action) > 3:
+    else:  # perform action based on current policy
+      self.onpolicy_action(evaluation)
 
-      for key, value in attack_actions.items():
-        self.current_action[key*2] = value[0]
-        self.current_action[key*2 + 1] = value[1]
-    else:
-      for key, value in attack_actions.items():
+    # ----- replace actions of attacked nodes -----
+    control_abs_idxs = [node.idx for node in self.control_nodes]
+    for key, value in attack_actions.items():
 
-        self.current_action[0] = value[0]
-        self.current_action[1] = value[1]
+      # map to absolute node idx
+      abs_key = self.nodes[key].idx
 
-    # map send action to absolute idxs
-    transformed_action = copy.copy(self.current_action)
+      if abs_key in control_abs_idxs:
+
+        # map to position in current_action
+        rel_key = control_abs_idxs.index(abs_key)
+
+        # sanity check
+        # if self.current_action[rel_key * 2] == value[0] and \
+        #     self.current_action[rel_key * 2 + 1] == value[1]:
+        #   print("adversary agrees with defender")
+
+        self.current_action[rel_key * 2] = value[0]
+        self.current_action[rel_key * 2 + 1] = value[1]
+
+    # map off-load action from relative idxs to absolute idxs
+    abs_action = copy.copy(self.current_action)
     for idx, node in enumerate(self.control_nodes):
       neighbors = node.neighbors
-      send_action = self.current_action[idx*2 + 1]
-      transformed_action[idx*2+1] = neighbors[send_action]
+      off_action = self.current_action[idx * 2 + 1]
+      abs_action[idx * 2 + 1] = neighbors[off_action]
 
-    return transformed_action
+    return abs_action
 
-
-  def update_Qvalue(self, reward, next_state):
-    """ Updates the Qvalue function of the agent using temporal difference
+  def update_qvalue(self, reward, next_state):
+    """ Updates a value in the Q-table of the agent using temporal difference
     learning.
 
+    Note: the value of the target policy is defined in sub-classes.
+
     Args:
-      reward (list of float): one-dimensional, contains individual node rewards
-      next_state (list of int): one-dimensional, contains individual node loads
+      reward (list of float): contains individual node rewards
+      next_state (list of int): contains individual node loads
+    """
 
-      """
-
+    # get current Qvalue
     current_entry = tuple(self.current_state + self.current_action)
-
     Qcurrent = self.Qtable[current_entry]
 
+    # compute value of target policy
     target = self.compute_target(next_state)
 
+    # update Q-value
+    td_error = sum(reward) + self.learn_parameters["gamma"] * target - Qcurrent
     self.Qtable[current_entry] = Qcurrent +\
-      self.alpha * (sum(reward) + self.gamma * target - Qcurrent)
+                                 self.learn_parameters["alpha"] * (td_error)
 
-    #self.updates.append(Qcurrent -self.Qtable[current_entry])
-
-  def update(self):
+  def update(self, reward, next_state, learn, opponent_action=[]):
     """ Updates an agent after interaction with the environment.
     """
     pass
@@ -246,15 +180,6 @@ class Agent():
      """
     pass
 
-  def greedy_action(self):
+  def onpolicy_action(self, deployment):
     """ Performs greedy action"""
     pass
-
-
-
-
-
-
-
-
-
