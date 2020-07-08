@@ -1,6 +1,6 @@
 # Rom-Q
 
-This repo contains my simulations for developing Rom-Q, a robust temporal difference learning algorithm for multi-agent systems. This project was developed during my research visit at the Intelligent and Autonomous Systems Group in CWI, under the supervision of Dr. Bloembergen and Dr. Kaisers.
+This repo contains my simulations for developing Rom-Q, a robust temporal difference learning algorithm for multi-agent systems. This project was developed during my research visit at the Intelligent and Autonomous Systems Group in CWI, under the supervision of Dr. Bloembergen and Dr. Kaisers. You can read more about the algorithm and simulations by reading the [report](report.pdf).
 
 The project was developed using Python 3.7.6.
 
