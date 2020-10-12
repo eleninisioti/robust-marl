@@ -189,7 +189,7 @@ class RomQAgent(Agent):
       current_entry[idx] = el
     qcurrent = self.Qtable[tuple(current_entry)]
 
-    if self.determ_execution and deployment:
+    if self.determ_execution:
       # ----- execute deterministic policy during deployment -----
       max_actions_flat = np.argmax(qcurrent)
 

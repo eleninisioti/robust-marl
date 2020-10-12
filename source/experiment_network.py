@@ -207,10 +207,16 @@ def main(args):
         os.makedirs("../projects/" + args.project)
 
       # load adversarial policy
-      adv_policy = pickle.load(open("../projects/" + args.orig_project +
-                                    "/policies/adversary_" + args.adversary +
-                                    "/trial_" + str(trial) +
-                                    "_adv_policy.pkl", "rb"))
+      if args.determ_adv:
+        policy_file = "../projects/" + args.orig_project + \
+                      "/policies/adversary_" + args.adversary + \
+        "/determ/trial_" + str(trial) + "_adv_policy.pkl"
+      else:
+        policy_file = "../projects/" + args.orig_project + \
+                      "/policies/adversary_" + args.adversary + \
+                      "/prob/trial_" + str(trial) + "_adv_policy.pkl"
+
+      adv_policy = pickle.load(open(policy_file, "rb"))
 
       adv_policy = adv_policy["sigma"]
 
@@ -258,7 +264,10 @@ def main(args):
       for agents_idx, agents in enumerate(agents_for_eval):
         train_epoch = epochs_for_eval[agents_idx]
 
+        print(delta_values)
+
         for current_delta in delta_values:
+          print(current_delta)
 
           performance_test = {"actions": [], "states": [], "current_states": [],
                               "rewards": [], "durations": []}
@@ -350,23 +359,26 @@ def main(args):
 
   # ----- keep track of intermediate episodes -----
   if not args.evaluate:
-    config = args
+    new_config = args
     # add information about intermediate epochs
     for key, val in interm_epochs.items():
       val = list(set(val))
       interm_epochs[key] = val
-    config.interm_epochs = interm_epochs
+    new_config.interm_epochs = interm_epochs
   else:
-    config = pickle.load(open("../projects/" + args.orig_project +
+    new_config = pickle.load(open("../projects/" + args.orig_project +
                               "/config.pkl", "rb"))
-    config.delta_values = delta_values
+    new_config.delta_values = delta_values
+    #print(new_config)
 
   # add logged data to config pickle
   logs = []
   for agent in agents:
     logs.append(agent.log)
-  config.logs = logs
-  pickle.dump(config, open("../projects/" + args.project + "/config.pkl", "wb"))
+  new_config.logs = logs
+  #print(new_config)
+  pickle.dump(new_config, open("../projects/" + args.project + "/config.pkl",
+                            "wb"))
 
 
 if __name__ == '__main__':

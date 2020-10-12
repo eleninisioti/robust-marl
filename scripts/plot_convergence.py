@@ -19,6 +19,7 @@ import seaborn
 import sys
 import pandas as pd
 import os
+import matplotlib
 
 # ----- project-specific imports ------
 sys.path.insert(0,"../source")
@@ -31,8 +32,24 @@ attack_type = sys.argv[2]
 # ----- set up -----
 project = "../projects/" + top_dir
 methods = ["Qlearning", "minimaxQ", "RomQ"]
+#methods = ["Qlearning"]
 seaborn.set()
 directories = [project + "/" + method for method in methods]
+
+seaborn.set()
+params = {'legend.fontsize': 'large',
+         'figure.figsize': (6, 4),
+         'axes.labelsize': 'x-large',
+         'axes.titlesize':'x-large',
+         'xtick.labelsize':'x-large',
+         'ytick.labelsize':'x-large'}
+matplotlib.rcParams.update(params)
+matplotlib.rc('text', usetex=True)
+matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+matplotlib.rcParams['mathtext.default']='regular'
+matplotlib.rcParams["font.weight"] = "bold"
+matplotlib.rcParams["axes.labelweight"] = "bold"
+
 
 
 # ----- plot convergence of duration without attacks for all methods -----
@@ -69,11 +86,12 @@ for idx, directory in enumerate(directories):
   seaborn.lineplot(x="sample", y="duration", data=dataframe, ci=100,
                    err_style="band", label=method)
 
+plt.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
 plt.xlabel("Sample")
 plt.ylabel("Average time to reset, $T_{reset}$")
 plt.legend()
 plt.title("$\delta=0$")
-plt.savefig("../plots/methods_duration.png")
+plt.savefig("../plots/comp_dur.png")
 plt.clf()
 
 # ----- plot convergence of rewards without attacks for all methods -----
@@ -110,11 +128,12 @@ for idx, directory in enumerate(directories):
   seaborn.lineplot(x="sample", y="reward", data=dataframe, ci=100,
                    err_style="band", label=method)
 
+plt.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
 plt.xlabel("Sample")
 plt.ylabel("Average sample reward, $r$")
 plt.title("$\delta=0$")
 plt.legend(loc="lower right")
-plt.savefig("../plots/methods_rewards.png")
+plt.savefig("../plots/comp_rewards.png")
 plt.clf()
 
 
@@ -164,5 +183,6 @@ for idx, directory in enumerate(directories):
   plt.ylabel("Average episode reward, $r$")
   plt.title("$\delta=0$")
   plt.legend(loc="lower center", prop={'size': 8}, ncol=3)
+  plt.ticklabel_format(axis='x', style='sci', scilimits=(0, 0))
   plt.savefig(directory + "/plots/rewards_attacks.png")
   plt.clf()

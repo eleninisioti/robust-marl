@@ -6,6 +6,7 @@ import pickle
 import matplotlib.pyplot as plt
 import seaborn
 import sys
+import matplotlib
 
 # ----- project-specific imports -----
 sys.path.insert(0,"../source")
@@ -15,10 +16,25 @@ from q_agent import *
 # parse input
 project = sys.argv[1]
 adversary = sys.argv[2]
-plot_interm = sys.argv[3] # indicates whethet to plot intermediate policies
+plot_interm = int(sys.argv[3]) # indicates whethet to plot intermediate policies
 
 # set up for plots
 seaborn.set()
+params = {'legend.fontsize': 'large',
+         'figure.figsize': (6, 6),
+         'axes.labelsize': 'x-large',
+         'axes.titlesize':'x-large',
+         'xtick.labelsize':'x-large',
+         'ytick.labelsize':'x-large'}
+matplotlib.rcParams.update(params)
+matplotlib.rc('text', usetex=True)
+matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
+matplotlib.rcParams['mathtext.default']='regular'
+matplotlib.rcParams["font.weight"] = "bold"
+matplotlib.rcParams["axes.labelweight"] = "bold"
+
+
+
 symbols = {"Qlearning": "Q", "minimaxQ": "M", "RomQ": "R"}
 
 # load project data
@@ -42,7 +58,7 @@ for trial in range(trials):
   for dir in adversary_dirs:
 
     plots_dir = dir
-    adversary_file = dir + "/adv_policy.pkl"
+    adversary_file = dir + "_adv_policy.pkl"
     adv_policy = pickle.load(open(adversary_file, "rb"))
     adv_policy = adv_policy["sigma"]
     adv_nodes = adv_policy[0]
@@ -51,8 +67,8 @@ for trial in range(trials):
     # plot state visits
     grid = np.ones(shape=(capacity+2, capacity+2))
     img = plt.imshow(grid.T, origin="lower", cmap="gray", vmin=0, vmax=1.5)
-    plt.xlabel("$s_1$", color="green")
-    plt.ylabel("$s_2$", color="blue")
+    plt.xlabel(r'$\boldsymbol{s_1}$', color="green")
+    plt.ylabel(r'$\boldsymbol{s_2}$', color="orange")
     plt.title(r'$\sigma_{}^*(s)$'.format(symbols[adversary]))
     plt.axvline(x=3.5, color="red", ymax=0.8)
     plt.axhline(y=3.5, color="red", xmax=0.8)
@@ -75,13 +91,13 @@ for trial in range(trials):
         if current_node == 0:
 
           plt.arrow(float(s1), float(s2), - serve_action/2, send_action/2,
-                    color="green",
+                    color="green",  linewidth=2,
                     head_width=0.05, head_length=0.1, length_includes_head=True)
         else:
 
           plt.arrow(float(s1), float(s2),  send_action/2, - serve_action/2,
-                    color="blue",
+                    color="orange",  linewidth=2,
                     head_width=0.05, head_length=0.1, length_includes_head=True)
 
-    plt.savefig(plots_dir + "/sigma_" + str(trial) + ".png")
+    plt.savefig(plots_dir + "_sigma_" + str(trial) + ".png", bbox_inches='tight')
     plt.clf()

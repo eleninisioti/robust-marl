@@ -176,7 +176,7 @@ class MinimaxQAgent(Agent):
       current_entry[idx] = el
     policy = self.policies[0][tuple(current_entry)]
 
-    if self.determ_execution and deployment:
+    if self.determ_execution:
       # ----- execute deterministic policy during deployment -----
       # get q-values for current state
       current_entry = [slice(None)] * len(self.state_space)
