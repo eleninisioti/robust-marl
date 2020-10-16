@@ -29,8 +29,8 @@ class RomQAgent(Agent):
       policy
   """
 
-  def __init__(self, nodes, epsilon, alpha, gamma, explore_attack,
-               determ_execution, attack_size):
+  def __init__(self, nodes, epsilon, alpha, gamma,
+                attack_size):
     """ Initialize Rom-Q agent.
 
     Args:
@@ -58,14 +58,12 @@ class RomQAgent(Agent):
     # initialize value function
     self.V = np.random.uniform(low=0, high=0.0001, size=tuple(self.state_space))
 
-    self.explore_attack = explore_attack
-    self.determ_execution = determ_execution
     self.attack_size = attack_size
 
     # initialize data for logging
     self.log["defenders"] = []
 
-  def update(self, reward, next_state, opponent_action, learn=True):
+  def update(self, reward, next_state, def_action, opponent_action, learn=True):
     """ Updates an agent after interaction with the environment.
 
     Args:
@@ -74,7 +72,8 @@ class RomQAgent(Agent):
       learn (bool): indicates whether the Q-table will be updated
     """
     if learn:
-      self.update_qvalue(reward=reward, next_state=next_state)
+      self.update_qvalue(reward=reward, next_state=next_state,
+                         def_action=def_action)
       self.update_policy()
 
     self.current_state = next_state
@@ -110,16 +109,8 @@ class RomQAgent(Agent):
     min_def = 1
 
     # restrict candidate adversaries if selection is random
-    if self.explore_attack:
-      x = random.uniform(0, 1)
-      if x < self.explore_attack:
-        random_adv = np.random.choice(range(len(self.nodes)),
-                                      self.attack_size, replace=False)
-        candidate_advs = [self.nodes[idx] for idx in random_adv]
-      else:
-        candidate_advs = self.nodes
-    else:
-      candidate_advs = self.nodes
+
+    candidate_advs = self.nodes
 
     # ----- search for worst-case adversarial selection of nodes-----
     for node_idx, adv_node in enumerate(candidate_advs):
@@ -131,8 +122,8 @@ class RomQAgent(Agent):
       def_idx = [node.idx for node in self.nodes if (node.idx) not in adv_idxs]
       def_idx = def_idx[0] # only works for two nodes
 
-      num_a = (len(self.nodes) - len(adv_idxs)) * 4
       num_o = len(adv_idxs) * 4
+      num_a = (len(self.nodes) - len(adv_idxs)) * 4
 
       # ----- swap axes in Q-table so that adversaries are first -----
       map = {}
@@ -149,12 +140,44 @@ class RomQAgent(Agent):
 
       qtable = np.reshape(qtable, (num_o, num_a))
 
+      # keep only eligible actions
+      opp_state = []
+      for opp in adv_idxs:
+        opp_state.append(self.current_state[opp - 1])
+
+      def_state = self.current_state[def_idx-1]
+      non_admissible = {0: [3, 2, 1], 1: [3]}
+      if opp_state[0] in non_admissible.keys():
+        inval_actions = non_admissible[opp_state[0]]
+        num_o = len(adv_idxs)* (4-len(inval_actions))
+        for inval in inval_actions:
+          qtable = np.delete(qtable, inval, 0)
+
+      if def_state in non_admissible.keys():
+        inval_actions = non_admissible[def_state]
+        num_a = 1*(4-len(inval_actions))
+        for inval in inval_actions:
+          qtable = np.delete(qtable, inval, 1)
+
+
       # solve linear program
       res = solve_LP(num_a, num_o, qtable)
 
       if res.success:
         current_pi = self.policies[def_idx - 1][tuple(current_entry)]
-        lp_policy = np.reshape(res.x[1:], current_pi.shape)
+
+        num_els = 4
+
+        if num_els!= len(res.x[1:]):
+          lp_policy = np.zeros((num_els,))
+          count = 0
+          for i in range(num_els):
+            if i not in inval_actions:
+              lp_policy[i] = res.x[1:][count]
+              count += 1
+        else:
+          lp_policy = res.x[1:]
+        lp_policy = np.reshape(lp_policy, current_pi.shape)
         V = res.x[0]
 
         # keep adversarial selection with minimum value
@@ -176,7 +199,7 @@ class RomQAgent(Agent):
 
     self.policies[min_def-1][tuple(current_entry)] = min_policy
 
-  def onpolicy_action(self, deployment):
+  def onpolicy_action(self):
     """ Performs the on-policy action.
 
     During training, actions are selected based on the probabilistic policy.
@@ -189,37 +212,13 @@ class RomQAgent(Agent):
       current_entry[idx] = el
     qcurrent = self.Qtable[tuple(current_entry)]
 
-    if self.determ_execution:
-      # ----- execute deterministic policy during deployment -----
-      max_actions_flat = np.argmax(qcurrent)
+    # ----- execute deterministic policy during deployment -----
+    max_actions_flat = np.argmax(qcurrent)
 
-      current_action = list(np.unravel_index(max_actions_flat,
-                                             qcurrent.shape))
+    current_action = list(np.unravel_index(max_actions_flat,
+                                           qcurrent.shape))
 
-      self.current_action = current_action
-
-    else:
-      # ----- execute probabilistc policy during training and deployment -----
-      self.current_action = []
-      for idx, node in enumerate(self.nodes):
-
-        # get node's policy
-        policy = self.policies[idx]
-
-        # get node's policy for current state
-        current_policy = policy[tuple(current_entry)]
-
-        # randomly sample policy
-        rand = np.random.rand()
-        flat_pi = np.ndarray.flatten(current_policy)
-        cumSumProb = np.cumsum(flat_pi)
-
-        action = 0
-        while rand > cumSumProb[action]:
-          action+=1
-
-        self.current_action.extend(list(np.unravel_index(action,
-                                                         current_policy.shape)))
+    self.current_action = current_action
 
     return self.current_action
 

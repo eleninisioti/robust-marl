@@ -11,7 +11,8 @@ import warnings
 warnings.filterwarnings("error", category=LinAlgWarning)
 
 # ----- project-specific imports -----
-from node import *
+from node import Node
+
 
 def solve_LP(num_a, num_o, game_table):
   """ Solves a linear program.
@@ -28,6 +29,7 @@ def solve_LP(num_a, num_o, game_table):
   Returns: the solution of the linear program, containing both the value and
   the policy   """
 
+
   # defines optimization objective
   c = np.zeros((num_a + 1, 1))
   c[0] = -1
@@ -38,7 +40,7 @@ def solve_LP(num_a, num_o, game_table):
   b_ub = np.zeros((num_o, 1))
 
   # equality contraints
-  A_eq = np.ones((1, num_o + 1))
+  A_eq = np.ones((1, num_a + 1))
   A_eq[0, 0] = 0
   b_eq = [1]
 
@@ -47,7 +49,7 @@ def solve_LP(num_a, num_o, game_table):
 
   # solve linear program
   counter = 0
-  while counter < 10:
+  while counter < 3:
 
     try:
       counter += 1
@@ -58,15 +60,17 @@ def solve_LP(num_a, num_o, game_table):
     else:
       break
 
-    if counter == 9:
-      print("Error: Optimisation failed.")
+    if counter == 2:
+      print("Error: Optimisation failed. Reducing accurary")
 
       # solve LP even if it is illconditioned
-      warnings.filterwarnings("default", category=LinAlgWarning)
+      #warnings.filterwarnings("default", category=LinAlgWarning)
 
       res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
-                    bounds=bounds)
-      warnings.filterwarnings("error", category=LinAlgWarning)
+                    bounds=bounds ,
+                    options={'sym_pos': False, "cholesky":  False, "lstsq":
+                      True})
+      #warnings.filterwarnings("error", category=LinAlgWarning)
   return res
 
 
@@ -83,6 +87,7 @@ def find_adversarial_policy(agents, attack_size):
     them consider relative idxs)
   """
 
+  non_admissible = {0: [[1, 1], [1, 0], [0, 1]], 1: [[1, 1]]}
   # get policies of all agents
   policies = []
   for idx, agent in enumerate(agents):
@@ -193,10 +198,24 @@ def find_adversarial_policy(agents, attack_size):
       act_entry[defender_idx*2] = def_actions[defender_idx*2]
       act_entry[defender_idx * 2 + 1] = def_actions[defender_idx * 2 +1]
       def_qtable = qcurrent[tuple(act_entry)]
-      adv_action = np.argmin(def_qtable)
-      adv_action = list(np.unravel_index(adv_action, def_qtable.shape))
-      value = np.min(def_qtable)
 
+      admissible = False
+      while not admissible:
+        print("looking for admissible")
+
+        adv_action = np.argmin(def_qtable)
+        adv_action = list(np.unravel_index(adv_action, def_qtable.shape))
+        value = np.min(def_qtable)
+
+        admissible = True
+        if current_state[advers[0]] in non_admissible.keys():
+          if adv_action in non_admissible[current_state[advers[0]]]:
+            admissible = False
+            def_qtable = np.where(def_qtable == value, 999, def_qtable)
+
+        print(adv_action, current_state[advers[0]])
+
+      # check whether the action is admissible
       # keep worst partition
       if value <= min_qvalue:
         worst_partition = advers
@@ -215,7 +234,7 @@ def find_adversarial_policy(agents, attack_size):
 
   sigma_actions = np.squeeze(sigma_actions) # in case we assumed too many
   # neighbors
-
+  print("finised")
   return [sigma_partitions, sigma_actions]
 
 def perform_attack(adversarial_policy, current_state, attack_size,
@@ -305,7 +324,7 @@ def perform_attack(adversarial_policy, current_state, attack_size,
 
 def env_interact(agents, prob_attack, payoffs, attack_size,
                  evaluation, attack_type, current_state=[],
-                 adversarial_policy=[]):
+                 adv_policy=[]):
   """ Performs an interaction between the agents and the environment.
   
   Args: 
@@ -329,7 +348,7 @@ def env_interact(agents, prob_attack, payoffs, attack_size,
   attack_actions = {}
 
   if attack_size > 0:
-    attack_actions = perform_attack(adversarial_policy=adversarial_policy,
+    attack_actions = perform_attack(adversarial_policy=adv_policy,
                                     attack_size=attack_size,
                                     current_state=current_state,
                                     attack_type=attack_type,
@@ -384,9 +403,13 @@ def env_interact(agents, prob_attack, payoffs, attack_size,
     dep = departures[node.idx - 1]
     recipient = recipients[node.idx - 1]
 
-    underflow, overflow, node_exec =\
+    underflow, overflow, node_exec, node_off =\
       node.transition(arrivals=arr, departures=dep,
                       executed=executed[node.idx - 1])
+
+    actions[(node.idx - 1)*2] = node_exec
+    actions[(node.idx - 1)*2 + 1] = node_off
+
 
     # ----- choose appropriate reward -----
     if overflow:
@@ -431,7 +454,7 @@ def create_pair(network_type, capacity):
   if network_type == "A":
     costs_1 = {0: 0, 2: 2}
     costs_2 = {0: 0, 1: 2}
-    serve_cost_1 = 1
+    serve_cost_1 = 4
     serve_cost_2 = 1
     spawn_rate_1 = 0.5
     spawn_rate_2 = 0.5

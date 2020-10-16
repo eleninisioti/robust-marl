@@ -32,7 +32,7 @@ attack_type = sys.argv[2]
 # ----- set up -----
 project = "../projects/" + top_dir
 methods = ["Qlearning", "minimaxQ", "RomQ"]
-#methods = ["Qlearning"]
+
 seaborn.set()
 directories = [project + "/" + method for method in methods]
 
@@ -50,8 +50,6 @@ matplotlib.rcParams['mathtext.default']='regular'
 matplotlib.rcParams["font.weight"] = "bold"
 matplotlib.rcParams["axes.labelweight"] = "bold"
 
-
-
 # ----- plot convergence of duration without attacks for all methods -----
 delta = 0
 for idx, directory in enumerate(directories):
@@ -66,7 +64,7 @@ for idx, directory in enumerate(directories):
 
     interm_epochs = config.interm_epochs[trial]
 
-    trial_dir = directory + "/trial_" + str(trial)
+    trial_dir = directory + "/data/eval/trial_" + str(trial)
     epoch_samples = 0
     for epoch in interm_epochs:
 
@@ -74,7 +72,7 @@ for idx, directory in enumerate(directories):
                     + methods[idx] + "_attack_" + attack_type
 
       # load test data
-      current_file = epoch_dir + "/data/test_data_" + str(delta) + ".pkl"
+      current_file = epoch_dir + "/data_" + str(delta) + ".pkl"
       data = pickle.load(open(current_file, "rb"))
       duration = data["performance"]["durations"]
       duration_dict["duration"].append(np.mean(duration))
@@ -108,21 +106,20 @@ for idx, directory in enumerate(directories):
   for trial in trials:
 
     interm_epochs = config.interm_epochs[trial]
-    trial_dir = directory + "/trial_" + str(trial)
+    trial_dir = directory + "/data/eval/trial_" + str(trial)
     epoch_samples = 0
     for epoch in interm_epochs:
-
+      
+      # load test data
       epoch_dir = trial_dir + "/epoch_" + str(epoch) + "/adversary_" \
                     + methods[idx] + "_attack_" + attack_type
 
-      # load test data
-      current_file = epoch_dir + "/data/test_data_" + str(delta) + ".pkl"
+      current_file = epoch_dir + "/data_" + str(delta) + ".pkl"
       data = pickle.load(open(current_file, "rb"))
       rewards = data["performance"]["rewards"]
       rewards_dict["reward"].append(np.mean(rewards))
       rewards_dict["sample"].append(epoch_samples)
       epoch_samples += int(config.train_samples/len(interm_epochs))
-
 
   dataframe = pd.DataFrame(data=rewards_dict)
   seaborn.lineplot(x="sample", y="reward", data=dataframe, ci=100,
@@ -131,7 +128,6 @@ for idx, directory in enumerate(directories):
 plt.ticklabel_format(axis='x', style='sci', scilimits=(0,0))
 plt.xlabel("Sample")
 plt.ylabel("Average sample reward, $r$")
-plt.title("$\delta=0$")
 plt.legend(loc="lower right")
 plt.savefig("../plots/comp_rewards.png")
 plt.clf()
@@ -153,17 +149,15 @@ for idx, directory in enumerate(directories):
 
     for trial in trials:
       interm_epochs = config.interm_epochs[trial]
-      trial_dir = directory + "/trial_" + str(trial)
+      trial_dir = directory + "/data/eval/trial_" + str(trial)
 
       epoch_samples = 0
       for epoch in interm_epochs:
 
+        # load test data
         epoch_dir = trial_dir + "/epoch_" + str(epoch) + "/adversary_" \
                       + methods[idx] + "_attack_" + attack_type
-
-
-        # load test data
-        current_file = epoch_dir + "/data/test_data_" + str(delta) + ".pkl"
+        current_file = epoch_dir + "/data_" + str(delta) + ".pkl"
         data = pickle.load(open(current_file, "rb"))
         rewards = data["performance"]["rewards"]
         sum_negative = np.sum([el for el in rewards if el<0])
@@ -173,7 +167,6 @@ for idx, directory in enumerate(directories):
         rewards_dict["sample"].append(epoch_samples)
 
         epoch_samples += int(config.train_samples/len(interm_epochs))
-
 
     dataframe = pd.DataFrame(data=rewards_dict)
     seaborn.lineplot(x="sample", y="reward", data=dataframe, ci=100,

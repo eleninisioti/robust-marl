@@ -7,6 +7,8 @@ import argparse
 def parse_flags():
   parser = argparse.ArgumentParser()
 
+
+  # ----- related to modelling the game -----
   parser.add_argument('--N',
                       help='Number of nodes',
                       type=int,
@@ -17,64 +19,40 @@ def parse_flags():
                       type=int,
                       default=0)
 
-  parser.add_argument('--evaluate',
-                      help='Evaluate a learned policy.',
-                      default=False,
-                      action="store_true")
-
-  parser.add_argument('--determ_execution',
-                      help='Deterministic execution of policies.',
-                      default=False,
-                      action="store_true")
-
-  parser.add_argument('--determ_adv',
-                      help='Deterministic adversarial policies.',
-                      default=False,
-                      action="store_true")
-
-  parser.add_argument('--explore_attack',
-                      help='Explore sub-optimal attacks (only for Rom-Q)',
-                      default=0,
-                      type=float)
-
-  parser.add_argument('--evaluate_interm',
-                      help='Indicates whether evaluation should be done all '
-                           'intermediate trained agents. Otherwise, only the '
-                           'final policy is evaluated.',
-                      default=False,
-                      action="store_true")
-
-  parser.add_argument('--adversarial_interm',
-                      help='Indicates whether intermediate policies will be '
-                           'computed, stored and used for evaluation.',
-                      default=False,
-                      action="store_true")
-
   parser.add_argument('--chigh',
                       help='Punishment for overflow',
                       type=int,
                       default=100)
 
   parser.add_argument('--utility',
-                      help='Reward for being alive',
+                      help='Reward for being alive (not over-flown or '
+                           'under-flown)',
                       type=int,
                       default=8)
 
-  parser.add_argument('--attack_type',
-                      help='Choose betweetn randa, randb and worst.',
-                      type=str,
-                      default="worst")
+  parser.add_argument('--capacity',
+                      help='Capacity of nodes',
+                      type=int,
+                      default=3)
 
   parser.add_argument('--K',
                       help='Number of adversaries',
                       type=int,
                       default=1)
 
-  parser.add_argument('--eval_attack_prob',
-                      help='Probability of attack during execution.',
-                      type=float,
-                      default=0)
+  parser.add_argument('--topology',
+                      help='The network topology. Choose between Ring and '
+                           'star.',
+                      type=str,
+                      default="ring")
 
+  parser.add_argument('--network_type',
+                      help='The type of network determines the modelling of '
+                           'nodes. Choose between A, B and C.',
+                      type=str,
+                      default="A")
+
+  # ----- related to learning parameters ------
   parser.add_argument('--learning_rate',
                       help='Learning rate for temporal difference learning.',
                       type=float,
@@ -90,18 +68,8 @@ def parse_flags():
                       type=float,
                       default=0.1)
 
-  parser.add_argument('--capacity',
-                      help='Capacity of nodes',
-                      type=int,
-                      default=3)
-
-  parser.add_argument('--trials',
-                      help='Number of Monte Carlo trials.',
-                      type=int,
-                      default=5)
-
-  parser.add_argument('--method',
-                      help='Indicates the learning method used. Choose '
+  parser.add_argument('--algorithm',
+                      help='Indicates the learning algorithm used. Choose '
                            'between Qlearning, minimaxQ and RomQ.',
                       type=str,
                       default="Qlearning")
@@ -112,46 +80,72 @@ def parse_flags():
                       type=str,
                       default="Qlearning")
 
-  parser.add_argument('--train_samples',
-                      help='Number of training samples',
+  parser.add_argument('--horizon',
+                      help='Number of iterations in episode',
                       type=int,
-                      default=50000)
+                      default=50)
 
-  parser.add_argument('--eval_samples',
-                      help='Number of evaluation samples',
-                      type=int,
-                      default=50000)
-
+  # ----- configuring the simulation ------
   parser.add_argument('--project',
                       help='Name of project',
                       type=str,
                       default="temp")
 
-  parser.add_argument('--explore',
-                      help='Exploration technique to use.',
-                      type=str,
-                      default="egreedy")
-
-  parser.add_argument('--topology',
-                      help='The network topology. Choose between Ring and '
-                           'star.',
-                      type=str,
-                      default="ring")
-
-  parser.add_argument('--network_type',
-                      help='Type of network. Choose between A, B and C.',
-                      type=str,
-                      default="A")
-
-  parser.add_argument('--seed',
-                      help='Seed used for generating random numbers.',
+  parser.add_argument('--trials',
+                      help='Number of monte carlo trials.',
                       type=int,
-                      default=0)
+                      default=5)
 
-  parser.add_argument('--horizon',
-                      help='Number of iterations in episode',
+  parser.add_argument('--epochs',
+                      help='Number of epochs (for saving intermediate '
+                           'results).',
                       type=int,
-                      default=50)
+                      default=5)
+
+  parser.add_argument('--train_samples',
+                      help='Number of training samples',
+                      type=int,
+                      default=1000000)
+
+  parser.add_argument('--eval_samples',
+                      help='Number of evaluation samples',
+                      type=int,
+                      default=20000)
+
+  parser.add_argument('--evaluate',
+                      help='Evaluate existing policies.',
+                      default=False,
+                      action="store_true")
+
+  parser.add_argument('--train',
+                      help='Train new policies.',
+                      default=False,
+                      action="store_true")
+
+  parser.add_argument('--evaluate_interm',
+                      help='Indicates whether all intermediate trained '
+                           'policies will be evaluated. Otherwise, only the '
+                           'policy after convergence is evaluated.',
+                      default=False,
+                      action="store_true")
+
+  parser.add_argument('--adversarial_interm',
+                      help='Indicates whether intermediate adversarial '
+                           'policies will be computed, stored and used for '
+                           'evaluation.',
+                      default=False,
+                      action="store_true")
+
+  parser.add_argument('--attack_type',
+                      help='Choose between rand, rand_nodes, rand_actions and'
+                           ' worst.',
+                      type=str,
+                      default="worst")
+
+  parser.add_argument('--eval_attack_prob',
+                      help='Probability of attack during evaluation.',
+                      type=float,
+                      default=1)
 
   args = parser.parse_args()
 

@@ -112,7 +112,7 @@ class Node:
       self.statistics = {"generations": [], "executions": 0, "departures": 0,
                        "arrivals": 0}
 
-    return underflow, overflow, executed
+    return underflow, overflow, executed, departures
 
 
 

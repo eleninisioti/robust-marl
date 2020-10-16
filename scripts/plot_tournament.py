@@ -12,11 +12,12 @@ import numpy as np
 counter = 0
 adv_determ = int(sys.argv[1])
 def_determ = int(sys.argv[2])
+attack_type = "worst"
 
 # ----- set up -----
 seaborn.set()
-top_dir = "../projects/refactor"
-directories = ["Qlearning", "minimaxQ", "RomQ"]
+top_dir = "../projects/debug"
+directories = ["/Qlearning_A", "/minimaxQ_A", "/RomQ_A"]
 methods = ["Qlearning", "minimaxQ", "RomQ"]
 adversaries = ["Qlearning","minimaxQ", "RomQ"]
 symbols = {"Qlearning": "Q", "minimaxQ": "M", "RomQ": "R", "minimaxQ":
@@ -38,29 +39,16 @@ for method_idx, method in enumerate(methods):
 
   for adv_idx, adversary in enumerate(adversaries):
 
-    if method == "Qlearning" or adversary == "Qlearning":
-      def_determ = 1
-    else:
-      def_determ = int(sys.argv[2])
-
     directory = directories[method_idx]
+    project_dir = top_dir + directory
 
-    if adversary == "Qlearning":
-      results_dir = top_dir + "/" + directory + "/performance/data/adversary_" + \
-                          adversary + \
-                  "_attack_worst/adv_" + str(bool(adv_determ)) \
-                  + "def_" + str(bool(def_determ))
-    else:
-      results_dir = top_dir + "/" + directory + "/performance/data/adversary_" + \
-                    adversary + \
-                    "_determ_attack_worst/adv_" + str(bool(adv_determ)) \
-                    + "def_" + str(bool(def_determ))
+    results_dir = project_dir + "/data/eval/tournament/adv_" + adversary +\
+                  "_attack_" + attack_type
 
     results_file = results_dir + "/robust_results.pkl"
 
     # ----- load performance data -----
     robust_data = pickle.load(open(results_file, "rb"))
-    print(robust_data)
     robust = robust_data["robust_trials"]
     xbb = np.ndarray.tolist(robust["delta"].values)
     rewardbb = np.ndarray.tolist(robust["reward"].values)
@@ -91,30 +79,19 @@ for adv_idx, adversary in enumerate(adversaries):
   for method_idx, method in enumerate(methods):
     directory = directories[method_idx]
 
-    if method == "Qlearning" or adversary == "Qlearning":
-      def_determ = 1
-    else:
-      def_determ = int(sys.argv[2])
+    project_dir = top_dir + directory
 
-    if adversary == "Qlearning":
-      results_dir = top_dir + "/" + directory + "/performance/data/adversary_" + \
-                            adversary + \
-                    "_attack_worst/adv_" + str(bool(adv_determ)) \
-                    + "def_" + str(bool(def_determ))
-    else:
-      results_dir = top_dir + "/" + directory + "/performance/data/adversary_" + \
-                    adversary + \
-                    "_determ_attack_worst/adv_" + str(bool(adv_determ)) \
-                    + "def_" + str(bool(def_determ))
+    results_dir = project_dir + "/data/eval/tournament/adv_" + adversary +\
+                  "_attack_" + attack_type
 
     results_file = results_dir + "/robust_results.pkl"
 
     # ----- load performance data -----
     robust_data = pickle.load(open(results_file, "rb"))
     robust = robust_data["robust_trials"]
-    seaborn.lineplot(x="delta", y="reward",  data=robust,  label=r'$\sigma_{}^*('
+    seaborn.lineplot(x="delta", y="reward",  data=robust,  label=r'$\pi_{}^*('
                                                       r's)$'.format(
-      symbols[adversary]), ax=ax, ci=90,
+      symbols[method]), ax=ax, ci=90,
                    err_style="band")
 
     # plt.plot(x="delta", y="reward", data=robust,
@@ -142,21 +119,10 @@ for method_idx, method in enumerate(methods):
     if method in adversary:
       directory = directories[method_idx]
 
-      if method == "Qlearning" or adversary == "Qlearning":
-        def_determ = 1
-      else:
-        def_determ = int(sys.argv[2])
+      project_dir = top_dir + directory
 
-      if adversary == "Qlearning":
-        results_dir = top_dir + "/" + directory + "/performance/data/adversary_" + \
-                      adversary + \
-                      "_attack_worst/adv_" + str(bool(adv_determ)) \
-                      + "def_" + str(bool(def_determ))
-      else:
-        results_dir = top_dir + "/" + directory + "/performance/data/adversary_" + \
-                      adversary + \
-                      "_determ_attack_worst/adv_" + str(bool(adv_determ)) \
-                      + "def_" + str(bool(def_determ))
+      results_dir = project_dir + "/data/eval/tournament/adv_" + adversary + \
+                    "_attack_" + attack_type
 
       results_file = results_dir + "/robust_results.pkl"
 
@@ -180,9 +146,7 @@ for method_idx, method in enumerate(methods):
 ax.set_xlabel("Probability of attack, $\delta$")
 ax.set_ylabel("Test performance, $r$")
 ax.legend()
-plt.savefig("../plots/robust_combined_adv" + str(adv_determ) + "_def_" +
-            str(def_determ) + ".png")
-plt.savefig("temp.png")
+plt.savefig("../plots/robust_combined.png")
 plt.clf()
 
 

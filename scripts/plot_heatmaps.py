@@ -25,10 +25,10 @@ from q_agent import *
 # ----- set up -----
 # parse input
 project = sys.argv[1] # name of project directory
-only_final = int(sys.argv[2]) # if True, only plots after convergence
+only_final = int(sys.argv[2]) # if True, only plots for final epoch
 evaluate = int(sys.argv[3]) # if True, only plots for evaluation
 adversary = sys.argv[4] # name of adversarial policy
-attack_type = sys.argv[5] # type of attack. choose among worst, randa and randb
+attack_type = sys.argv[5] # type of attack
 
 # set up for plots
 seaborn.set()
@@ -38,6 +38,7 @@ params = {'legend.fontsize': 'large',
          'axes.titlesize':'x-large',
          'xtick.labelsize':'x-large',
          'ytick.labelsize':'x-large'}
+
 matplotlib.rcParams.update(params)
 matplotlib.rc('text', usetex=True)
 matplotlib.rcParams['text.latex.preamble']=[r"\usepackage{amsmath}"]
@@ -48,25 +49,25 @@ matplotlib.rcParams["axes.labelweight"] = "bold"
 # load project data
 config = pickle.load(open("../projects/" + project + "/config.pkl",  "rb"))
 trials = list(range(config.trials))
+#trials = list(range(3))
 delta_values = config.delta_values
-delta_values = [0, 0.1, 0.2, 0.30000000000000004, 0.4, 0.5, 0.6, 0.7000000000000001, 0.8, 0.9, 1.0]
-data_train = {}
+
 
 # create a different plot for each trial and epoch
 for trial in trials:
 
   if only_final:
-    epochs = [config.interm_epochs[trial][-1]]
-    print(epochs)
+    epochs = [config.epochs[-1]]
   else:
-    epochs = config.interm_epochs[trial]
+    epochs = config.epochs
 
   for epoch in epochs:
 
     # load training data
-    data_train = pickle.load(open("../projects/" + project + "/trial_" +
-                                  str(trial) + "/epoch_" + str(epoch) +
-                                  "/train_data.pkl", "rb"))
+    train_dir = "../projects/" + project + "/data/train/trial_" +  str(trial) +\
+                "/epoch_" + str(epoch)
+    data_train = pickle.load(open(train_dir + "/data.pkl", "rb"))
+
     qtables = []
     agents = data_train["agents"]
     for agent in agents:
@@ -78,10 +79,10 @@ for trial in trials:
       # load data about performance during evaluation
       for delta in delta_values:
 
-        datasets[delta] = pickle.load(open("../projects/" + project + "/eval/adv_Truedef_True/trial_" + str(trial) + "/epoch_" +
-                                           str(epoch) + "/adversary_" +
-                                           adversary + "_attack_" +
-                                           attack_type + "/data/test_data_" +
+        eval_dir = "../projects/" + project + "/data/eval/trial_" + str(
+          trial) + "/epoch_" + str(epoch) + "/adv_" + adversary + "_attack_" +\
+                   attack_type
+        datasets[delta] = pickle.load(open(eval_dir + "/data_" +
                                            str(delta) + ".pkl",  "rb"))
 
       plot_train = False # do not plot state visits during training
@@ -90,7 +91,7 @@ for trial in trials:
 
       # load data about performance during training
       datasets[0] = data_train
-      epochs = [config.interm_epochs[trial][-1]]
+      epochs = [config.epochs[-1]]
 
     for key, value in datasets.items():
       delta = key
@@ -99,27 +100,21 @@ for trial in trials:
 
       # heatmap of state visits
       actions = performance["actions"]
-      next_states = performance["states"]
-
-      # current states during training have not been saved
-      if not evaluate:
-        current_states = performance["states"]
-      else:
-        current_states = performance["current_states"]
+      states = performance["states"]
 
       iters = len(actions)
       visits = np.zeros(shape=(config.capacity+2, config.capacity+2))
 
       for iter in range(iters):
-        next_state = next_states[iter]
+        next_state = states[iter]
 
         # keeping track of the next states in order to show over-flows
         visits[next_state[0], next_state[1]] += 1
 
-        # but need to make sure that resets are also shown
-        current_state = current_states[iter]
-        if current_state == [0,0]:
-          visits[0,0] += 1
+      # show over-flows
+      overflows = performance["overflows"]
+      for el in overflows:
+        visits[el[0], el[1]] += 1
 
       cmap = 'Blues'
       img = plt.imshow(visits.T, cmap=plt.get_cmap(cmap),
@@ -139,6 +134,8 @@ for trial in trials:
           actions1 = np.argmax(Qtable_current)
           actions1 = list(np.unravel_index(actions1, Qtable_current.shape))
 
+          actions_temp = np.amax(Qtable_current)
+          print(np.where(Qtable_current == actions_temp))
           # only minimax-Q has two Q-tables
           if len(qtables) > 1:
             Qtable = qtables[1]
@@ -181,16 +178,24 @@ for trial in trials:
       plt.axvline(x=3.5,color="red", ymax=0.8)
       plt.axhline(y=3.5,color="red", xmax=0.8)
 
-      plot_dir = "../projects/" + project + "/trial_" + str(trial) + \
-                 "/epoch_" + str(epoch) + "/adversary_" + adversary + \
-                 "_attack_" + attack_type + "/plots"
+      if plot_train:
+        plot_dir = "../projects/" + project + "/plots/train/trial_" + str(
+          trial) + "/epoch_" + str(epoch)
+
+      else:
+        plot_dir = "../projects/" + project + "/plots/eval/trial_" + str(
+          trial) + "/epoch_" + str(epoch) + "/adv_" + adversary + "_attack_" +\
+                   attack_type
+
       if not os.path.exists(plot_dir):
         os.makedirs(plot_dir)
 
       if plot_train:
-        plot_file = plot_dir + "/train_grid.png"
+        plot_file = plot_dir + "/grid.png"
       else:
-        plot_file = plot_dir + "/test_grid_" + str(delta) + ".png"
+        plot_file = plot_dir + "/grid_" + str(delta) + ".png"
+
+      print(plot_file)
 
       plt.savefig(plot_file, bbox_inches='tight')
       plt.clf()

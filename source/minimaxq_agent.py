@@ -26,8 +26,7 @@ class MinimaxQAgent(Agent):
     V (array of float): an array of dimension state_space
   """
 
-  def __init__(self, nodes, epsilon, alpha, gamma, opp_idxs,
-               determ_execution):
+  def __init__(self, nodes, epsilon, alpha, gamma, opp_idxs):
     """ Initialize minimax-Q agent.
 
     Args:
@@ -38,8 +37,7 @@ class MinimaxQAgent(Agent):
 
     super().__init__(nodes=nodes, epsilon=epsilon, alpha=alpha, gamma=gamma)
 
-    self.determ_execution = determ_execution
-    
+
     # determine control nodes
     idxs = [node.idx for node in nodes]
     defend_idxs = [idx for idx in idxs if idx not in opp_idxs]
@@ -58,7 +56,7 @@ class MinimaxQAgent(Agent):
     self.V = np.random.uniform(low=0, high=0.0001, size=tuple(self.state_space))
 
 
-  def update(self, reward, next_state, opponent_action, learn=True):
+  def update(self, reward, next_state, def_action, opponent_action, learn=True):
     """ Updates an agent after interaction with the environment.
 
     Args:
@@ -85,7 +83,7 @@ class MinimaxQAgent(Agent):
         opp_neighbs = opp_node.neighbors
 
         # get relative index of neighbor opponent chose to off-load to
-        position = opp_neighbs.index(action)
+        position = opp_neighbs[action]
 
         trans_action[idx] = position
 
@@ -105,8 +103,10 @@ class MinimaxQAgent(Agent):
     self.current_action = comb_action
 
     if learn:
-      self.update_qvalue(reward=reward, next_state=next_state)
+      self.update_qvalue(reward=reward, next_state=next_state,
+                         def_action=def_action)
       self.update_policy()
+
     self.current_state = next_state
 
   def update_policy(self, retry=False):
@@ -141,14 +141,51 @@ class MinimaxQAgent(Agent):
       qtable = np.swapaxes(qtable, key, value)
 
     qtable = np.reshape(qtable, (num_o, num_a))
-    
+
+    # keep only eligible actions
+    opp_idxs = [node.idx for node in self.nodes if node not in
+                                                  self.control_nodes]
+    opp_state = []
+    for opp in opp_idxs:
+      opp_state.append(self.current_state[opp - 1])
+
+    def_idxs = [node.idx for node in self.nodes if node in self.control_nodes]
+    def_state = []
+    for defe in def_idxs:
+      def_state.append(self.current_state[defe - 1])
+
+    non_admissible = {0: [3, 2, 1], 1: [3]}
+    if opp_state[0] in non_admissible.keys():
+      inval_actions = non_admissible[opp_state[0]]
+      num_o = len(opp_idxs) * (4 - len(inval_actions))
+      for inval in inval_actions:
+        qtable = np.delete(qtable, inval, 0)
+
+    if def_state[0] in non_admissible.keys():
+      inval_actions = non_admissible[def_state[0]]
+      num_a = len(def_idxs) * (4 - len(inval_actions))
+      for inval in inval_actions:
+        qtable = np.delete(qtable, inval, 1)
+
     # solve linear program
     res = solve_LP(num_a, num_o, qtable)
 
     if res.success:
       current_pi = self.policies[0][tuple(current_entry)]
-      self.policies[0][tuple(current_entry)] = np.reshape(res.x[1:],
-                                                     current_pi.shape)
+      num_els = 4
+
+      if num_els != len(res.x[1:]):
+        lp_policy = np.zeros((num_els,))
+        count = 0
+        for i in range(num_els):
+          if i not in inval_actions:
+            lp_policy[i] = res.x[1:][count]
+            count += 1
+      else:
+        lp_policy = res.x[1:]
+      lp_policy = np.reshape(lp_policy, current_pi.shape)
+
+      self.policies[0][tuple(current_entry)] = lp_policy
       self.V[tuple(current_entry)] = res.x[0]
 
     elif not retry:
@@ -167,50 +204,34 @@ class MinimaxQAgent(Agent):
     return self.V[tuple(next_state)]
 
 
-  def onpolicy_action(self, deployment):
+  def onpolicy_action(self):
     """ Performs greedy action
     """
-    # get state-specific policy
+
+    # ----- execute deterministic policy during deployment -----
+    # get q-values for current state
     current_entry = [slice(None)] * len(self.state_space)
     for idx, el in enumerate(self.current_state):
       current_entry[idx] = el
-    policy = self.policies[0][tuple(current_entry)]
+    qcurrent = self.Qtable[tuple(current_entry)]
 
-    if self.determ_execution:
-      # ----- execute deterministic policy during deployment -----
-      # get q-values for current state
-      current_entry = [slice(None)] * len(self.state_space)
-      for idx, el in enumerate(self.current_state):
-        current_entry[idx] = el
-      qcurrent = self.Qtable[tuple(current_entry)]
+    # find greedy action
+    max_actions_flat = np.argmax(qcurrent)
+    current_action = list(np.unravel_index(max_actions_flat,
+                                           qcurrent.shape))
 
-      # find greedy action
-      max_actions_flat = np.argmax(qcurrent)
-      current_action = list(np.unravel_index(max_actions_flat,
-                                             qcurrent.shape))
+    # find dimensions of defenders
+    defender_dims = []
+    for idx, node in enumerate(self.nodes):
+      if node in self.control_nodes:
+        defender_dims.extend([idx*2,idx*2+1])
 
-      # find dimensions of defenders
-      defender_dims = []
-      for idx, node in enumerate(self.nodes):
-        if node in self.control_nodes:
-          defender_dims.extend([idx*2,idx*2+1])
+    # isolate defender actions
+    defend_action = []
+    for node_idx, action in enumerate(current_action):
+      if node_idx in defender_dims:
+        defend_action.append(action)
 
-      # isolate defender actions
-      defend_action = []
-      for node_idx, action in enumerate(current_action):
-        if node_idx in defender_dims:
-          defend_action.append(action)
-
-      self.current_action = defend_action
-
-    else:
-      rand = np.random.rand()
-      flat_pi = np.ndarray.flatten(policy)
-      cumSumProb = np.cumsum(flat_pi)
-
-      action = 0
-      while rand > cumSumProb[action]:
-        action += 1
-      self.current_action = list(np.unravel_index(action, policy.shape))
+    self.current_action = defend_action
 
     return self.current_action

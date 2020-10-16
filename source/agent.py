@@ -4,7 +4,6 @@ agent."""
 # ----- generic imports -----
 import numpy as np
 import random
-import itertools
 import copy
 
 
@@ -119,7 +118,7 @@ class Agent:
             random.randint(0, len(node.neighbors) - 1))
 
     else:  # perform action based on current policy
-      self.onpolicy_action(evaluation)
+      self.onpolicy_action()
 
     # ----- replace actions of attacked nodes -----
     control_abs_idxs = [node.idx for node in self.control_nodes]
@@ -144,7 +143,7 @@ class Agent:
 
     return abs_action
 
-  def update_qvalue(self, reward, next_state):
+  def update_qvalue(self, reward, next_state, def_action):
     """ Updates a value in the Q-table of the agent using temporal difference
     learning.
 
@@ -156,6 +155,7 @@ class Agent:
     """
 
     # get current Qvalue
+    self.current_action = def_action
     current_entry = tuple(self.current_state + self.current_action)
     Qcurrent = self.Qtable[current_entry]
 
@@ -167,7 +167,7 @@ class Agent:
     self.Qtable[current_entry] = Qcurrent +\
                                  self.learn_parameters["alpha"] * td_error
 
-  def update(self, reward, next_state, learn, opponent_action=[]):
+  def update(self, reward, next_state, learn, def_action=[], opponent_action=[]):
     """ Updates an agent after interaction with the environment.
     """
     pass

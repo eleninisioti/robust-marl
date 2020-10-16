@@ -2,9 +2,10 @@
 
 # ----- generic imports -----
 import numpy as np
+import random
 
 # ----- project-specific imports -----
-from agent import *
+from agent import Agent
 
 class QAgent(Agent):
   """ An agent that uses classical Q-learning.
@@ -31,7 +32,7 @@ class QAgent(Agent):
         policy_action_space))
 
 
-  def update(self, reward, next_state, learn=True, opponent_action=[]):
+  def update(self, reward, next_state, def_action, opponent_action, learn=True):
     """ Updates an agent after interaction with the environment.
 
     Args:
@@ -40,7 +41,8 @@ class QAgent(Agent):
       learn (bool): indicates whether the Q-table will be updated
     """
     if learn:
-      self.update_qvalue(reward=reward, next_state=next_state)
+      self.update_qvalue(reward=reward, next_state=next_state,
+                         def_action=def_action)
 
     self.current_state = next_state
 
@@ -63,7 +65,7 @@ class QAgent(Agent):
     # pick Q-value of greedy action
     return np.max(qnext)
 
-  def onpolicy_action(self, evaluation=False):
+  def onpolicy_action(self):
     """ Finds the greedy action based on the deterministic policy.
     """
     # get q-values for current state
