@@ -7,8 +7,8 @@ import math
 import itertools
 
 # ----- project-specific imports -----
-from agent import *
-from tools import *
+from agent import Agent
+from tools import solve_LP
 
 class RomQAgent(Agent):
   """ An agent that uses RomQ-learning.
@@ -29,16 +29,11 @@ class RomQAgent(Agent):
       policy
   """
 
-  def __init__(self, nodes, epsilon, alpha, gamma,
-                attack_size):
-    """ Initialize Rom-Q agent.
+  def __init__(self, nodes, epsilon, alpha, gamma, attack_size):
+    """ Initialize RoM-Q agent.
 
     Args:
-      opp_idxs (list of int): absolute indexes of opponents
-      explore_attack (float): the probability with which random adversaries,
-      instead of worst-case, are chosen
-      determ_execution (bool): indicates whether execution of policies during
-       deployment should be deterministic
+
       attack_size (int): number of adversaries considered to compute target
       policy
     """
@@ -63,7 +58,8 @@ class RomQAgent(Agent):
     # initialize data for logging
     self.log["defenders"] = []
 
-  def update(self, reward, next_state, def_action, opponent_action, learn=True):
+  def update(self, reward, next_state, def_action=[], opponent_action=[],
+             learn=True):
     """ Updates an agent after interaction with the environment.
 
     Args:
@@ -108,10 +104,7 @@ class RomQAgent(Agent):
     min_policy = np.array([])
     min_def = 1
 
-    # restrict candidate adversaries if selection is random
-
     candidate_advs = self.nodes
-
     # ----- search for worst-case adversarial selection of nodes-----
     for node_idx, adv_node in enumerate(candidate_advs):
 
@@ -159,19 +152,18 @@ class RomQAgent(Agent):
         for inval in inval_actions:
           qtable = np.delete(qtable, inval, 1)
 
-
       # solve linear program
       res = solve_LP(num_a, num_o, qtable)
 
       if res.success:
         current_pi = self.policies[def_idx - 1][tuple(current_entry)]
 
-        num_els = 4
-
-        if num_els!= len(res.x[1:]):
-          lp_policy = np.zeros((num_els,))
+        if len(res.x[1:]) != num_a:
+          # if some of the actions were invalid we need to map the result
+          # appropriately
+          lp_policy = np.zeros((num_a,))
           count = 0
-          for i in range(num_els):
+          for i in range(num_a):
             if i not in inval_actions:
               lp_policy[i] = res.x[1:][count]
               count += 1
@@ -214,10 +206,8 @@ class RomQAgent(Agent):
 
     # ----- execute deterministic policy during deployment -----
     max_actions_flat = np.argmax(qcurrent)
-
     current_action = list(np.unravel_index(max_actions_flat,
                                            qcurrent.shape))
-
     self.current_action = current_action
 
     return self.current_action

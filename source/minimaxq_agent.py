@@ -1,4 +1,4 @@
-""" Contains the implementation of a MinimaxQ-learning agent."""
+""" Contains the implementation of a minimaxQ-learning agent."""
 
 # ----- generic imports -----
 import numpy as np
@@ -7,8 +7,8 @@ import math
 import itertools
 
 # ----- project-specific imports -----
-from agent import *
-from tools import *
+from agent import Agent
+from tools import solve_LP
 
 
 class MinimaxQAgent(Agent):
@@ -19,11 +19,6 @@ class MinimaxQAgent(Agent):
   for each node, where all others are opponents, we can learn a different
   policy for each node.
 
-  Attributes:
-    control_nodes (list of Node): the nodes whose actions are controlled
-    determ_execution (bool): indicates whether execution of policies during
-       deployment should be deterministic
-    V (array of float): an array of dimension state_space
   """
 
   def __init__(self, nodes, epsilon, alpha, gamma, opp_idxs):
@@ -31,12 +26,9 @@ class MinimaxQAgent(Agent):
 
     Args:
       opp_idxs (list of int): absolute indexes of opponents
-      determ_execution (bool): indicates whether execution of policies during
-       deployment should be deterministic
     """
 
     super().__init__(nodes=nodes, epsilon=epsilon, alpha=alpha, gamma=gamma)
-
 
     # determine control nodes
     idxs = [node.idx for node in nodes]
@@ -56,12 +48,15 @@ class MinimaxQAgent(Agent):
     self.V = np.random.uniform(low=0, high=0.0001, size=tuple(self.state_space))
 
 
-  def update(self, reward, next_state, def_action, opponent_action, learn=True):
+  def update(self, reward, next_state, def_action=[], opponent_action=[],
+             learn=True):
     """ Updates an agent after interaction with the environment.
 
     Args:
       reward (list of float): contains individual node rewards
       next_state (list of int): contains individual node loads
+      def_action (list of int): contains actions of defenders
+      opponent_action (list of int): contains actions of opponents
       learn (bool): indicates whether the Q-table will be updated
     """
 
@@ -170,14 +165,18 @@ class MinimaxQAgent(Agent):
     # solve linear program
     res = solve_LP(num_a, num_o, qtable)
 
-    if res.success:
-      current_pi = self.policies[0][tuple(current_entry)]
-      num_els = 4
+    if res is None:
+      print("LP failed. No policy update.")
 
-      if num_els != len(res.x[1:]):
-        lp_policy = np.zeros((num_els,))
+    elif res.success:
+      current_pi = self.policies[0][tuple(current_entry)]
+
+      if len(res.x[1:]) != num_a:
+        # if some of the actions were invalid we need to map the result
+        # appropriately
+        lp_policy = np.zeros((num_a,))
         count = 0
-        for i in range(num_els):
+        for i in range(num_a):
           if i not in inval_actions:
             lp_policy[i] = res.x[1:][count]
             count += 1
@@ -185,15 +184,9 @@ class MinimaxQAgent(Agent):
         lp_policy = res.x[1:]
       lp_policy = np.reshape(lp_policy, current_pi.shape)
 
+      # update policy and value function
       self.policies[0][tuple(current_entry)] = lp_policy
       self.V[tuple(current_entry)] = res.x[0]
-
-    elif not retry:
-      return self.update_policy(retry=True)
-
-    else:
-      print("Alert : %s" % res.message)
-
 
   def compute_target(self, next_state):
     """ Computes the value of the target policy.
@@ -205,9 +198,8 @@ class MinimaxQAgent(Agent):
 
 
   def onpolicy_action(self):
-    """ Performs greedy action
+    """ Performs the greedy action based on current policy.
     """
-
     # ----- execute deterministic policy during deployment -----
     # get q-values for current state
     current_entry = [slice(None)] * len(self.state_space)
@@ -233,5 +225,4 @@ class MinimaxQAgent(Agent):
         defend_action.append(action)
 
     self.current_action = defend_action
-
     return self.current_action

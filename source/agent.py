@@ -89,7 +89,7 @@ class Agent:
     scheme and the presence of attackers.
 
     This function is used both during training, when no adversaries can be
-    present, and evluation, when no exploration should take place.
+    present, and evaluation, when no exploration should take place.
 
     Note: the policy is defined over the action space of defenders. Except
     for minimaxQ, where some nodes are defenders and some opponents,
@@ -98,16 +98,16 @@ class Agent:
 
     Args:
        attack_actions (dict of int: int): has the from abs_idx: relative actions
-       deployment (bool): indicates whether the policy is currently being
+       evaluation (bool): indicates whether the policy is currently being
        deployed, in which case no exploration takes place
 
     Returns:
       a list of actions to execute, where indexes are absolute
     """
 
-    # ----- execute e-greedy policy -----
+    # ----- epsilon-greedy policy -----
     x = random.uniform(0, 1)
-    if ((x < self.learn_parameters["epsilon"]) and not(evaluation)):
+    if x < self.learn_parameters["epsilon"] and not evaluation:
 
       # perform random move
       self.current_action = []
@@ -115,7 +115,7 @@ class Agent:
         if node in self.control_nodes:
           self.current_action.append(random.randint(0, 1))  # execute action
           self.current_action.append(
-            random.randint(0, len(node.neighbors) - 1))
+            random.randint(0, len(node.neighbors) - 1)) # off-load action
 
     else:  # perform action based on current policy
       self.onpolicy_action()
@@ -144,14 +144,17 @@ class Agent:
     return abs_action
 
   def update_qvalue(self, reward, next_state, def_action):
-    """ Updates a value in the Q-table of the agent using temporal difference
-    learning.
+    """ Updates a value in the Q-table of the agent.
 
-    Note: the value of the target policy is defined in sub-classes.
+    Note: the value of the target policy is not computed by this class.  The
+    agent needs to be informed about the actions that it executed in the
+    previous step, in case it had chosen an invalid action (e.g. execute a
+    task when the state is 0).
 
     Args:
       reward (list of float): contains individual node rewards
       next_state (list of int): contains individual node loads
+      def_action (list of int): actions executed in the previous step
     """
 
     # get current Qvalue
@@ -167,8 +170,16 @@ class Agent:
     self.Qtable[current_entry] = Qcurrent +\
                                  self.learn_parameters["alpha"] * td_error
 
-  def update(self, reward, next_state, learn, def_action=[], opponent_action=[]):
+  def update(self, reward, next_state,  def_action=[],
+             opponent_action=[], learn=True):
     """ Updates an agent after interaction with the environment.
+
+    Args:
+      reward (list of float): contains individual node rewards
+      next_state (list of int): contains individual node loads
+      def_action (list of int): contains actions of defenders
+      opponent_action (list of int): contains actions of opponents
+      learn (bool): indicates whether the Q-table will be updated
     """
     pass
 
@@ -179,5 +190,5 @@ class Agent:
     pass
 
   def onpolicy_action(self, deployment):
-    """ Performs greedy action"""
+    """ Returns the greedy action according to the current policy ."""
     pass

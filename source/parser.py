@@ -7,7 +7,6 @@ import argparse
 def parse_flags():
   parser = argparse.ArgumentParser()
 
-
   # ----- related to modelling the game -----
   parser.add_argument('--N',
                       help='Number of nodes',

@@ -50,26 +50,40 @@ def solve_LP(num_a, num_o, game_table):
   # solve linear program
   counter = 0
   while counter < 3:
+    feasible = True
 
     try:
       counter += 1
       res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
                     bounds=bounds)
+    except ValueError:
+      print(ValueError)
+      feasible = False
+
     except:
       print("Error: result is inaccurate due to illconditioning.")
     else:
       break
 
     if counter == 2:
-      print("Error: Optimisation failed. Reducing accurary")
+      if feasible:
 
-      # solve LP even if it is illconditioned
-      #warnings.filterwarnings("default", category=LinAlgWarning)
+        print("Error: Optimisation failed. Reducing accurary")
 
-      res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
-                    bounds=bounds ,
-                    options={'sym_pos': False, "cholesky":  False, "lstsq":
-                      True})
+        # solve LP even if it is illconditioned
+        # warnings.filterwarnings("default", category=LinAlgWarning)
+
+        try:
+
+          res = linprog(c, A_ub=A_ub, b_ub=b_ub, A_eq=A_eq, b_eq=b_eq,
+                      bounds=bounds, options={'sym_pos': False,
+                                              "cholesky": False,
+                                              "lstsq": True})
+        except ValueError:
+          res = None
+
+      else:
+        res = None
       #warnings.filterwarnings("error", category=LinAlgWarning)
   return res
 
@@ -459,46 +473,11 @@ def create_pair(network_type, capacity):
     spawn_rate_1 = 0.5
     spawn_rate_2 = 0.5
     
-  elif network_type == "B":
-    costs_1 = {0: 0, 2: 5}
-    costs_2 = {0: 0, 1: 1}
-    serve_cost_1 = 1
-    serve_cost_2 = 1
-    spawn_rate_1 = 0.7
-    spawn_rate_2 = 0
+  else:
+    print("Error: this network type has not been defined.")
+    quit()
 
-  elif network_type == "BR":
-    costs_1 = {0: 0, 2: 5}
-    costs_2 = {0: 0, 1: 1}
-    serve_cost_1 = 1
-    serve_cost_2 = 1
-    spawn_rate_1 = 0
-    spawn_rate_2 = 0.7
-
-  elif network_type == "C":
-    costs_1 = {0: 0, 2: 3}
-    costs_2 = {0: 0, 1: 3}
-    serve_cost_1 = 8
-    serve_cost_2 = 1  # # was 1
-    spawn_rate_1 = 0.7
-    spawn_rate_2 = 0.5
-
-  elif network_type == "D":
-    costs_1 = {0: 0, 2: 3}
-    costs_2 = {0: 0, 1: 3}
-    serve_cost_1 = 5
-    serve_cost_2 = 1  # # was 1
-    spawn_rate_1 = 0.7
-    spawn_rate_2 = 0.5
-
-  elif network_type == "R":
-    costs_1 = {0: 0, 2: 3}
-    costs_2 = {0: 0, 1: 3}
-    serve_cost_2 = 5
-    serve_cost_1 = 1  # # was 1
-    spawn_rate_2 = 0.7
-    spawn_rate_1 = 0.5
-
+  # ----- build network -----
   nodes = []
   neighbors = [0, 2]
   node = Node(capacity=capacity, neighbors=neighbors, idx=1, off_costs=costs_1,

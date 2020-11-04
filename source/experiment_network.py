@@ -52,13 +52,15 @@ def create_agents(algorithm, nodes):
 
   return agents
 
-def execute_trial(trial, args, samples, adv_policy = [], evaluation=False, \
-                                                                 delta=0):
+def execute_trial(trial, args, samples, adv_policy = [], evaluation=False,
+                  delta=0):
 
-  results_dic = {"rewards": [], "actions": [], "states": [], "overflows": []}
+  results_dic = {"rewards": [], "actions": [], "states": [], "overflows": [],
+                 "durations": []}
   sample = 0
   episode = 0
   stop_episode = False
+  duration = 0
   
   control_nodes = []
   for agent in args.agents:
@@ -72,6 +74,10 @@ def execute_trial(trial, args, samples, adv_policy = [], evaluation=False, \
     if (new_episode > episode) or stop_episode:
       episode = episode + 1
       change_episode = True
+
+      # update duration
+      results_dic["durations"].append(duration)
+      duration = 0
     else:
       change_episode = False
 
@@ -142,11 +148,14 @@ def execute_trial(trial, args, samples, adv_policy = [], evaluation=False, \
                             "/data" + ".pkl", "wb"))
 
       # clear data for memory management
-      results_dic= {"rewards": [], "actions": [], "states": [], "overflows": []}
+      results_dic = {"rewards": [], "actions": [], "states": [], "overflows":
+        [], "durations": []}
 
     sample += 1
+    duration += 1
     
   return results_dic
+
 
 def main(args):
 
@@ -174,7 +183,7 @@ def main(args):
   data_dir_eval = "../projects/" + args.project + "/data/eval"
 
   new_dirs = []
-  for trial in range(args.trials):
+  for trial in range(20, args.trials):
     
     new_dirs.append(policies_dir + "/trial_" + str(trial))
 
@@ -194,7 +203,7 @@ def main(args):
 
   pickle.dump(args, open("../projects/" + args.project + "/config.pkl",  "wb"))
   # ----- simulations take place -----
-  for trial in range(args.trials):
+  for trial in range(20, args.trials):
 
     # set seed for trial
     random.seed(trial)
@@ -237,8 +246,6 @@ def main(args):
       else:
         epochs_for_eval = [args.epochs[-1]]
 
-      print(epochs_for_eval)
-
       for epoch in epochs_for_eval:
         dir = "../projects/" + args.project + "/data/train" + "/trial_" +  \
               str(trial) + "/epoch_" + str(epoch)
@@ -264,10 +271,11 @@ def main(args):
           pickle.dump({"nodes": nodes, "performance": test_data},
                       file=open(eval_dir + "/data_" + str(current_delta)
                                 + ".pkl", "wb"))
-  # logs = []
-  # for agent in args.agents:
-  #   args.logs.append(agent.log)
-  # args["logs"] = logs
+  logs = []
+  for agent in args.agents:
+    args.logs.append(agent.log)
+  args["logs"] = logs
+
 
 if __name__ == '__main__':
   args = parse_flags()
