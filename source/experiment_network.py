@@ -183,7 +183,7 @@ def main(args):
   data_dir_eval = "../projects/" + args.project + "/data/eval"
 
   new_dirs = []
-  for trial in range(20, args.trials):
+  for trial in range(args.trials):
     
     new_dirs.append(policies_dir + "/trial_" + str(trial))
 
@@ -203,7 +203,7 @@ def main(args):
 
   pickle.dump(args, open("../projects/" + args.project + "/config.pkl",  "wb"))
   # ----- simulations take place -----
-  for trial in range(20, args.trials):
+  for trial in range(args.trials):
 
     # set seed for trial
     random.seed(trial)
@@ -271,10 +271,6 @@ def main(args):
           pickle.dump({"nodes": nodes, "performance": test_data},
                       file=open(eval_dir + "/data_" + str(current_delta)
                                 + ".pkl", "wb"))
-  logs = []
-  for agent in args.agents:
-    args.logs.append(agent.log)
-  args["logs"] = logs
 
 
 if __name__ == '__main__':

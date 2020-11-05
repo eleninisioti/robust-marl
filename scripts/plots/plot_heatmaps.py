@@ -133,9 +133,8 @@ for trial in trials:
           Qtable_current = Qtable[tuple(current_entry)]
           actions1 = np.argmax(Qtable_current)
           actions1 = list(np.unravel_index(actions1, Qtable_current.shape))
-
           actions_temp = np.amax(Qtable_current)
-          print(np.where(Qtable_current == actions_temp))
+
           # only minimax-Q has two Q-tables
           if len(qtables) > 1:
             Qtable = qtables[1]
@@ -194,8 +193,6 @@ for trial in trials:
         plot_file = plot_dir + "/grid.png"
       else:
         plot_file = plot_dir + "/grid_" + str(delta) + ".png"
-
-      print(plot_file)
 
       plt.savefig(plot_file, bbox_inches='tight')
       plt.clf()
