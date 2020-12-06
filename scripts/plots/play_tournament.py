@@ -47,8 +47,6 @@ for method_idx, method in enumerate(methods):
       for trial in range(config.trials):
         epoch = config.epochs[-1]
 
-        print(trial)
-
         # load performance data
         eval_dir = project_dir + "/data/eval/trial_" + str(trial) + "/epoch_"\
                    + str(epoch) + "/adv_" + adversary + "_attack_" + attack_type

@@ -76,18 +76,42 @@ for trial in range(trials):
       serve_action = current_actions[0]
       send_action = current_actions[1]
 
+
+
       if current_node == 0:
 
-        plt.arrow(float(s1), float(s2), - serve_action/2, send_action/2,
+        if not (serve_action + send_action):
+          offset_x = 0
+        else:
+          offset_x = 0.1
+
+        if not (send_action):
+          offset_y = 0
+        else:
+          offset_y = 0.1
+
+        plt.arrow(float(s1), float(s2), - serve_action - send_action + offset_x,
+                  send_action - offset_y,
                   color="green",  linewidth=2,
-                  head_width=0.05, head_length=0.1, length_includes_head=True)
+                  head_width=0.1, head_length=0.15, length_includes_head=True)
 
         circle = plt.Circle((float(s1), float(s2)), 0.1, color="green")
       else:
 
-        plt.arrow(float(s1), float(s2),  send_action/2, - serve_action/2,
+        if not (send_action):
+          offset_x = 0
+        else:
+          offset_x = 0.1
+
+        if not (send_action + serve_action):
+          offset_y = 0
+        else:
+          offset_y = 0.1
+
+        plt.arrow(float(s1), float(s2),  send_action -offset_x, - serve_action
+                  -send_action + offset_y,
                   color="orange",  linewidth=2,
-                  head_width=0.05, head_length=0.1, length_includes_head=True)
+                  head_width=0.1, head_length=0.15, length_includes_head=True)
 
         circle = plt.Circle((float(s1), float(s2)), 0.1, color="orange")
       ax.add_artist(circle)

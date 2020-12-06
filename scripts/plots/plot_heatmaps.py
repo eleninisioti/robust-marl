@@ -154,16 +154,38 @@ for trial in trials:
           serve_action_2 = current_actions[2]
           send_action_2 = current_actions[3]
 
+          if not (serve_action_1 + send_action_1):
+            offset_x = 0
+          else:
+            offset_x = 0.1
+
+          if not (send_action_1):
+            offset_y = 0
+          else:
+            offset_y = 0.1
+
           # draw arrow (when a node executes, it reduces its own state by 1,
           # when it off-loads, it increase the other node's state by 1 )
-          plt.arrow(s1, s2, - serve_action_1/2, send_action_1/2,
+          plt.arrow(s1, s2, - serve_action_1 - send_action_1 +offset_x,
+                    send_action_1-offset_y,
                     color="green", linewidth=2,
-                    head_width=0.05, head_length=0.1, length_includes_head=True)
+                    head_width=0.1, head_length=0.15, length_includes_head=True)
 
           # draw arrow
-          plt.arrow(s1, s2, send_action_2/2, - serve_action_2/2,
-                    color="orange", linewidth=2,
-                    head_width=0.05, head_length=0.1, length_includes_head=True)
+          if not (send_action_2):
+            offset_x = 0
+          else:
+            offset_x = 0.1
+
+          if not (send_action_2 + serve_action_2):
+            offset_y = 0
+          else:
+            offset_y = 0.1
+          plt.arrow(s1, s2, send_action_2 -offset_x,
+                    - serve_action_2 -send_action_2 + offset_y, color="orange",
+                    linewidth=2,
+                    head_width=0.1, head_length=0.15,
+                    length_includes_head=True)
 
       # make a color bar
       plt.colorbar(img, cmap=plt.get_cmap(cmap))

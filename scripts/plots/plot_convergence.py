@@ -32,7 +32,9 @@ attack_type = "worst"
 # ----- set up -----
 project = "../projects/" + top_dir
 methods = ["Qlearning", "minimaxQ", "RomQ"]
-plot_dir = top_dir + "/plots"
+symbols = {"Qlearning": "{Q-learning}", "minimaxQ": "{minimax-Q}", "RomQ":
+  "{RoM-Q}"}
+plot_dir = "../projects/" + top_dir + "/plots"
 if not os.path.exists(plot_dir):
    os.makedirs(plot_dir)
 
@@ -83,7 +85,7 @@ for idx, directory in enumerate(directories):
 
   dataframe = pd.DataFrame(data=duration_dict)
   seaborn.lineplot(x="sample", y="duration", data=dataframe, ci=100,
-                   err_style="band", label=method)
+                   err_style="band", label=symbols[method])
 
 plt.plot([0, interm_epochs[-1]], [50, 50], color='black', linestyle ="--",
          linewidth=2)
@@ -126,7 +128,7 @@ for idx, directory in enumerate(directories):
 
   dataframe = pd.DataFrame(data=rewards_dict)
   seaborn.lineplot(x="sample", y="reward", data=dataframe, ci=100,
-                   err_style="band", label=method)
+                   err_style="band", label=symbols[method])
 
 plt.plot([0, interm_epochs[-1]], [14,14], color='black', linestyle ="--",
          linewidth=2)
@@ -137,5 +139,7 @@ plt.ylabel("Average sample reward, $r$")
 plt.legend(loc="lower right")
 plt.savefig(plot_dir + "/comp_rewards.png", bbox_inches='tight')
 plt.clf()
+
+print(plot_dir)
 
 
